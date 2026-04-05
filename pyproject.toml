@@ -1,0 +1,32 @@
+[project]
+name = "vla-rscl"
+version = "0.1.0"
+description = "RS-CL DL2: Contrastive Representation Regularization for VLA Models"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.1",
+    "torchvision>=0.16",
+    "numpy",
+    "h5py",
+    "matplotlib",
+    "pillow",
+    "tqdm",
+    "pyyaml",
+    "termcolor",
+    "huggingface_hub",
+]
+
+[project.optional-dependencies]
+# robosuite and libero need --no-deps on macOS (egl_probe is Linux-only).
+# Install manually: pip install robosuite==1.4.0 --no-deps && pip install libero --no-deps
+sim = [
+    "robosuite==1.4.0",
+    "libero",
+    "mujoco",
+    "robomimic",
+    "bddl",
+]
+dev = [
+    "ipython",
+    "ipykernel",
+]

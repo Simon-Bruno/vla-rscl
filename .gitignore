@@ -1,0 +1,11 @@
+data/
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+wandb/
+outputs/
+checkpoints/
+*.pt
+*.ckpt
+.DS_Store
