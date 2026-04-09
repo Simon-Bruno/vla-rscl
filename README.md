@@ -14,56 +14,62 @@ trains groot n1.5 on libero with 3 configs:
 ## setup (snellius)
 
 ```bash
-# clone the repo
 git clone https://github.com/Simon-Bruno/vla-rscl.git
 cd vla-rscl
-git checkout feat/groot-baseline
 
 # clone isaac-groot (not tracked in git)
 git clone https://github.com/NVIDIA/Isaac-GR00T.git
 cd Isaac-GR00T && git checkout n1.5-release && cd ..
 
-# run setup job (installs deps + downloads libero datasets)
-sbatch jobs/setup.job
+# create conda env with python 3.11 (groot n1.5 needs <3.13)
+conda create -n rscl python=3.11 -c conda-forge -y
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 
-# watch progress
-tail -f slurm_setup_*.out
-```
+# install torch + flash-attn
+pip install torch==2.6.0 torchvision --index-url https://download.pytorch.org/whl/cu126
+module load CUDA/12.6.0
+pip install flash-attn --no-build-isolation
 
-the setup job installs isaac-groot, flash-attention, libero sim deps, and downloads all 4 libero suites (spatial, object, goal, long) in lerobot v2 format from huggingface.
+# install isaac-groot + deps
+cd Isaac-GR00T && pip install -e ".[finetune]" --no-deps && cd ..
+pip install transformers==4.51.3
+pip install diffusers accelerate einops peft timm kornia albumentations av fastparquet hydra-core omegaconf opencv-python-headless numpydantic dm-tree wandb==0.18.0 decord pyzmq
+FORCE_CUDA=0 pip install "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git" --no-build-isolation
 
-## smoke test
+# install our extension
+pip install -e .
 
-after setup completes, verify everything works:
+# download libero datasets
+bash scripts/setup_and_download.sh
 
-```bash
-srun --partition=gpu_a100 --gpus=1 --cpus-per-task=18 --time=00:15:00 --pty bash
-
-python -m rscl.train \
-    --dataset_path data/libero/libero_spatial_no_noops_1.0.0_lerobot \
-    --contrastive_loss none \
-    --max_steps 50 \
-    --output_dir /tmp/smoke_test
-
-# should print loss values within a few minutes. ctrl+c when satisfied.
+# install libero for eval
+cd /tmp && git clone https://github.com/Lifelong-Robot-Learning/LIBERO.git
+cp -r /tmp/LIBERO/libero $HOME/.conda/envs/rscl/lib/python3.11/site-packages/
+pip install robosuite==1.4.0 bddl easydict imageio-ffmpeg
 ```
 
 ## run experiments
 
 ```bash
-sbatch jobs/train_baseline.job      # E1: no contrastive loss
-sbatch jobs/train_vanilla_cl.job    # E2: vanilla infonce
-sbatch jobs/train_rscl.job          # E3: rs-cl (proprio-weighted infonce)
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+
+sbatch jobs/train_baseline.job
+sbatch jobs/train_vanilla_cl.job
+sbatch jobs/train_rscl.job
 ```
 
 all 3 jobs train on all 4 libero suites for 60k steps on a single a100. results go to wandb under `dl2_rscl/rscl`.
 
-## check progress
+## eval
+
+after training completes:
 
 ```bash
-squeue -u $USER
-tail -f slurm_rscl_*.out
+python scripts/create_eval_metadata.py
+bash jobs/eval_all.sh
 ```
+
+this runs libero simulation with 50 trials per task across all suites. results and rollout videos are saved to `Isaac-GR00T/rollouts/`.
 
 ## project structure
 
@@ -76,10 +82,16 @@ vla-rscl/
 │   ├── action_head.py    # FlowmatchingWithRSCL (subclass of groot's action head)
 │   └── train.py          # training script wrapping isaac-groot
 ├── jobs/                 # slurm scripts
-│   ├── setup.job         # install + download data
+│   ├── setup.job
 │   ├── train_baseline.job
 │   ├── train_vanilla_cl.job
-│   └── train_rscl.job
+│   ├── train_rscl.job
+│   ├── eval.job
+│   └── eval_all.sh
+├── scripts/              # helper scripts
+│   ├── setup_and_download.sh
+│   ├── download_data.py
+│   └── create_eval_metadata.py
 └── data/libero/          # downloaded datasets (gitignored)
 ```
 
