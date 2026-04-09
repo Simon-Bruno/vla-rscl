@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Eval
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=12:00:00
+#SBATCH --output=slurm_eval_%A.out
+
+# usage: sbatch jobs/eval.job <checkpoint_dir> [suite]
+# example: sbatch jobs/eval.job outputs/baseline libero_spatial
+
+CHECKPOINT=${1:-outputs/baseline/checkpoint-60000}
+SUITE=${2:-libero_spatial}
+PORT=$((5555 + RANDOM % 1000))
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+# patch torch.load to allow numpy globals (libero init states use pickle)
+python -c "
+import torch, functools
+_orig = torch.load
+@functools.wraps(_orig)
+def _patched(*a, **kw):
+    kw.setdefault('weights_only', False)
+    return _orig(*a, **kw)
+torch.load = _patched
+" 2>/dev/null || true
+
+export TORCH_SERIALIZATION_WEIGHTS_ONLY=0
+
+echo "evaluating checkpoint: $CHECKPOINT on suite: $SUITE"
+
+# start inference server in background
+python Isaac-GR00T/scripts/inference_service.py \
+    --model_path "$CHECKPOINT" \
+    --server \
+    --data_config examples.Libero.custom_data_config:LiberoDataConfig \
+    --denoising-steps 8 \
+    --port $PORT \
+    --embodiment-tag new_embodiment &
+
+SERVER_PID=$!
+echo "server started (pid $SERVER_PID), waiting for it to load..."
+sleep 60
+
+# run eval client
+cd Isaac-GR00T
+python -m examples.Libero.eval.run_libero_eval \
+    --task_suite_name "$SUITE" \
+    --num_trials_per_task 50 \
+    --port $PORT \
+    --headless
+cd ..
+
+# cleanup
+kill $SERVER_PID 2>/dev/null
+echo "eval complete"

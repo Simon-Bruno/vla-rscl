@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=RSCL
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=48:00:00
+#SBATCH --output=slurm_rscl_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+python -m rscl.train \
+    --dataset_path \
+        data/libero/libero_spatial_no_noops_1.0.0_lerobot \
+        data/libero/libero_object_no_noops_1.0.0_lerobot \
+        data/libero/libero_goal_no_noops_1.0.0_lerobot \
+        data/libero/libero_10_no_noops_1.0.0_lerobot \
+    --output_dir outputs/rscl \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 1.0 \
+    --max_steps 60000 \
+    --batch_size 32 \
+    --video_backend torchvision_av \
+    --seed 0

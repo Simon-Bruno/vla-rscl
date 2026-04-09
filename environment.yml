@@ -1,0 +1,35 @@
+name: rscl
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pytorch=2.5
+  - torchvision
+  - pytorch-cuda=12.1
+  - numpy
+  - h5py
+  - matplotlib
+  - pillow
+  - tqdm
+  - pyyaml
+  - pip
+  - pip:
+    - termcolor
+    - huggingface_hub
+    - wandb
+    - transformers
+    - sentencepiece
+    - protobuf
+    - robosuite==1.4.0
+    - libero
+    - mujoco
+    - robomimic
+    - bddl
+    - numba
+    - easydict
+    - cloudpickle
+    - gymnasium
+    - opencv-python-headless
+    - scipy

@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Setup
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=04:00:00
+#SBATCH --output=slurm_setup_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+module load CUDA/12.6.0
+
+cd $HOME/vla-rscl
+
+# --- 1. create conda env with python 3.11 (groot n1.5 needs <3.13) ---
+CONDA_NO_PLUGINS=true /sw/arch/RHEL9/EB_production/2025/software/Anaconda3/2025.06-1/bin/conda create -n rscl python=3.11 -c conda-forge -y || true
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+
+# --- 2. install torch + flash-attn ---
+pip install torch==2.6.0 torchvision --index-url https://download.pytorch.org/whl/cu126
+pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.6cxx11abiTRUE-cp311-cp311-linux_x86_64.whl
+
+# --- 3. install isaac-groot (n1.5) ---
+cd Isaac-GR00T
+git checkout n1.5-release
+pip install -e ".[finetune]" --no-deps
+pip install transformers==4.51.3
+pip install diffusers accelerate einops peft timm kornia albumentations av fastparquet hydra-core omegaconf opencv-python-headless numpydantic dm-tree wandb==0.18.0 decord
+FORCE_CUDA=0 pip install "pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git" --no-build-isolation
+cd ..
+
+# --- 4. install our rscl extension ---
+pip install -e .
+
+# --- 5. download libero datasets in lerobot format ---
+DATA_DIR=$HOME/vla-rscl/data/libero
+
+for SUITE in libero_spatial libero_object libero_goal libero_10; do
+    echo "downloading ${SUITE}..."
+    HF_NAME="IPEC-COMMUNITY/${SUITE}_no_noops_1.0.0_lerobot"
+    LOCAL_DIR="${DATA_DIR}/${SUITE}_no_noops_1.0.0_lerobot"
+
+    python -c "
+from huggingface_hub import snapshot_download
+snapshot_download('${HF_NAME}', repo_type='dataset', local_dir='${LOCAL_DIR}')
+print('done: ${SUITE}')
+"
+    mkdir -p "${LOCAL_DIR}/meta"
+    cp Isaac-GR00T/examples/Libero/modality.json "${LOCAL_DIR}/meta/modality.json"
+done
+
+echo "setup complete"
