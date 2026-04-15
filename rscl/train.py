@@ -194,7 +194,7 @@ def main():
         dataloader_num_workers=config.dataloader_num_workers,
         bf16=True,
         report_to=config.report_to,
-        run_name=f"{config.contrastive_loss}-libero-s{config.seed}",
+        run_name=f"{config.contrastive_loss}-{config.data_config.split(':')[-1] if ':' in config.data_config else config.data_config}-s{config.seed}",
         seed=config.seed,
         remove_unused_columns=False,
     )
