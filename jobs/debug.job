@@ -2,13 +2,13 @@
 
 #SBATCH --partition=gpu_a100
 #SBATCH --nodes=1
-#SBATCH --gpus=4
-#SBATCH --ntasks-per-node=4
+#SBATCH --gpus=1
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --job-name=RSCL-RC
-#SBATCH --mem=480G
-#SBATCH --time=10:00:00
-#SBATCH --output=slurm_rscl_robocasa_%A.out
+#SBATCH --job-name=RSCL-DBG
+#SBATCH --mem=120G
+#SBATCH --time=00:30:00
+#SBATCH --output=slurm_debug_%A.out
 
 module purge
 module load 2025
@@ -26,23 +26,21 @@ set -a
 source .env
 set +a
 
-srun torchrun \
-    --nproc_per_node=4 \
-    --nnodes=1 \
-    -m rscl.train_robocasa \
+python -m rscl.train_robocasa \
     --dataset_path \
         data/robocasa/gr1_unified.PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_1000 \
-        data/robocasa/gr1_unified.PnPCanToDrawerClose_GR1ArmsAndWaistFourierHands_1000 \
-    --output_dir outputs/rscl_robocasa \
+    --output_dir outputs/debug \
     --data_config fourier_gr1_arms_waist \
     --embodiment_tag gr1 \
     --tune_visual \
     --contrastive_loss rscl \
     --tau 0.2 \
     --beta 1.0 \
-    --max_steps 60000 \
-    --batch_size 4 \
+    --max_steps 10 \
+    --batch_size 2 \
     --learning_rate 3e-5 \
-    --gradient_accumulation_steps 12 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 999999 \
     --video_backend torchvision_av \
+    --report_to none \
     --seed 0
