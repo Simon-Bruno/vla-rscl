@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --nodes=1
+#SBATCH --gpus=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --job-name=RSCL-DBG
+#SBATCH --mem=120G
+#SBATCH --time=00:30:00
+#SBATCH --output=slurm_debug_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon
+
+# Load environment variables for wandb
+set -a
+source .env
+set +a
+
+python -m rscl.train_robocasa \
+    --dataset_path \
+        data/robocasa/gr1_unified.PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_1000 \
+    --output_dir outputs/debug \
+    --data_config fourier_gr1_arms_waist \
+    --embodiment_tag gr1 \
+    --tune_visual \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 1.0 \
+    --max_steps 10 \
+    --batch_size 2 \
+    --learning_rate 3e-5 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 999999 \
+    --video_backend torchvision_av \
+    --report_to none \
+    --seed 0

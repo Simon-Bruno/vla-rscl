@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#SBATCH --partition=rome
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=01:00:00
+#SBATCH --output=slurm_setup_eval_%A.out
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+cd $HOME/vla-rscl-simon
+
+# install robosuite
+if ! python -c "import robosuite" 2>/dev/null; then
+    echo "installing robosuite..."
+    pip install -e robosuite
+fi
+
+# install robocasa-gr1-tabletop-tasks
+echo "installing robocasa-gr1-tabletop-tasks..."
+git clone https://github.com/robocasa/robocasa-gr1-tabletop-tasks.git 2>/dev/null || true
+pip install -e robocasa-gr1-tabletop-tasks
+
+# download simulation assets
+echo "downloading assets..."
+python robocasa-gr1-tabletop-tasks/robocasa/scripts/download_tabletop_assets.py -y
+
+echo "verifying..."
+python -c "import robocasa; print(robocasa OK)"
+python -c "import robosuite; print(robosuite OK)"
+echo "setup complete"

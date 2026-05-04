@@ -105,9 +105,10 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         h, w = self._adapt_with_summary(raw_features)
         z = self.projector(w)
 
-        # augmented path (view cutoff -> re-run adapter)
-        augmented = self.view_cutoff(raw_features)
-        _, w_aug = self._adapt_with_summary(augmented)
+        # augmented path (view cutoff -> re-run adapter, no grad to save memory)
+        augmented = self.view_cutoff(raw_features.detach())
+        with torch.no_grad():
+            _, w_aug = self._adapt_with_summary(augmented)
         z_aug = self.projector(w_aug)
 
         backbone_output["backbone_features"] = h
@@ -197,3 +198,19 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             "cl_loss": cl_loss_val.detach(),
         }
         return BatchFeature(data=output_dict)
+
+    @property
+    def device(self):
+        try:
+            return next(iter(self.parameters())).device
+        except StopIteration:
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    @property
+    def dtype(self):
+        try:
+            return next(iter(self.parameters())).dtype
+        except StopIteration:
+            dtype_str = getattr(self.config, "model_dtype", "float32")
+            return getattr(torch, dtype_str, torch.float32)
+

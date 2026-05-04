@@ -1,0 +1,51 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=BASE-RC
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=48:00:00
+#SBATCH --output=slurm_baseline_robocasa_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon
+
+set -a
+source .env
+set +a
+
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/baseline_robocasa
+HOME_OUT=$HOME/vla-rscl-simon/outputs/baseline_robocasa
+mkdir -p $SCRATCH_OUT
+
+# copy existing checkpoint to scratch for resume
+if [ -d "$HOME_OUT" ]; then
+    cp -r $HOME_OUT/* $SCRATCH_OUT/ 2>/dev/null || true
+fi
+
+DATA_ROOT=data/robocasa
+DATASET_PATHS=()
+for d in "$DATA_ROOT"/*_1000; do
+    [ -d "$d" ] && DATASET_PATHS+=("$d")
+done
+
+python -m rscl.train_robocasa     --dataset_path "${DATASET_PATHS[@]}"     --output_dir $SCRATCH_OUT     --data_config fourier_gr1_arms_waist     --embodiment_tag gr1     --tune_visual     --contrastive_loss none     --max_steps 60000     --batch_size 8     --learning_rate 3e-5     --gradient_accumulation_steps 4     --save_steps 5000     --save_total_limit 2     --video_backend torchvision_av     --seed 0
+
+# copy final model + latest checkpoint back to home
+echo "Copying results back to home..."
+mkdir -p $HOME_OUT
+cp $SCRATCH_OUT/*.safetensors $SCRATCH_OUT/*.json $HOME_OUT/ 2>/dev/null || true
+LATEST_CKPT=$(ls -d $SCRATCH_OUT/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -1)
+if [ -n "$LATEST_CKPT" ]; then
+    cp -r "$LATEST_CKPT" $HOME_OUT/
+fi
+echo "Done. Results in $HOME_OUT"

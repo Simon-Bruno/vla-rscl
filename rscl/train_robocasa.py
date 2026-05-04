@@ -79,7 +79,10 @@ class RSCLTrainer(DualBrainTrainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         step = self.state.global_step
         lam = self.rscl_config.lambda_init * 0.5 * (1 + math.cos(math.pi * step / self.total_steps))
-        model.action_head._current_lambda = lam
+        
+        # Handle DataParallel/DistributedDataParallel wrapping
+        base_model = model.module if hasattr(model, "module") else model
+        base_model.action_head._current_lambda = lam
 
         outputs = model(inputs)
         loss = outputs["loss"]
@@ -212,7 +215,7 @@ def main():
         compute_dtype=compute_dtype,
     )
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
     trainer.save_model(config.output_dir, _internal_call=True)
 
 
