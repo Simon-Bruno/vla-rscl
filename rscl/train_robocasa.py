@@ -215,6 +215,21 @@ def main():
         compute_dtype=compute_dtype,
     )
 
+    # save experiment_cfg/metadata.json for inference service
+    import json as _json
+    exp_cfg_dir = Path(config.output_dir) / "experiment_cfg"
+    exp_cfg_dir.mkdir(parents=True, exist_ok=True)
+    metadata_json = {}
+    inner_ds = dataset.dataset if hasattr(dataset, "dataset") else dataset
+    if isinstance(inner_ds, LeRobotSingleDataset):
+        metadata_json[inner_ds.tag] = inner_ds.metadata.model_dump(mode="json")
+    elif isinstance(inner_ds, LeRobotMixtureDataset):
+        metadata_json.update(
+            {tag: meta.model_dump(mode="json") for tag, meta in inner_ds.merged_metadata.items()}
+        )
+    with open(exp_cfg_dir / "metadata.json", "w") as f:
+        _json.dump(metadata_json, f, indent=4)
+
     trainer.train(resume_from_checkpoint=True)
     trainer.save_model(config.output_dir, _internal_call=True)
 
