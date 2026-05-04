@@ -22,8 +22,8 @@ eval "$(conda shell.bash hook)"
 conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
-export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$HOME/vla-rscl-simon/robocasa-gr1-tabletop-tasks:$PYTHONPATH
-cd $HOME/vla-rscl-simon
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$HOME/vla-rscl-simon/vla-rscl/robocasa-gr1-tabletop-tasks:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
 
 set -a
 source .env

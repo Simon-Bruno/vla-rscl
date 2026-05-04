@@ -8,7 +8,7 @@
 #SBATCH --output=slurm_setup_eval_%A.out
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
-cd $HOME/vla-rscl-simon
+cd $HOME/vla-rscl-simon/vla-rscl
 
 # install robosuite
 if ! python -c "import robosuite" 2>/dev/null; then

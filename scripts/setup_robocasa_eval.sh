@@ -2,7 +2,7 @@
 set -e
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
-cd $HOME/vla-rscl-simon
+cd $HOME/vla-rscl-simon/vla-rscl
 
 # install robosuite if not present
 if ! python -c "import robosuite" 2>/dev/null; then

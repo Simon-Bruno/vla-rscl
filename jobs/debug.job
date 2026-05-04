@@ -18,8 +18,8 @@ eval "$(conda shell.bash hook)"
 conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
-export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$PYTHONPATH
-cd $HOME/vla-rscl-simon
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
 
 # Load environment variables for wandb
 set -a

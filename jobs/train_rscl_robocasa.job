@@ -16,15 +16,15 @@ eval "$(conda shell.bash hook)"
 conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
-export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$PYTHONPATH
-cd $HOME/vla-rscl-simon
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
 
 set -a
 source .env
 set +a
 
 SCRATCH_OUT=/scratch-shared/scur0198/outputs/rscl_robocasa
-HOME_OUT=$HOME/vla-rscl-simon/outputs/rscl_robocasa
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/rscl_robocasa
 mkdir -p $SCRATCH_OUT
 
 # copy existing checkpoint to scratch for resume
