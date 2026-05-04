@@ -45,6 +45,7 @@ echo "Copying results back to home..."
 mkdir -p $HOME_OUT
 # copy final model files (non-checkpoint)
 cp $SCRATCH_OUT/*.safetensors $SCRATCH_OUT/*.json $HOME_OUT/ 2>/dev/null || true
+cp -r $SCRATCH_OUT/experiment_cfg $HOME_OUT/ 2>/dev/null || true
 # copy the last checkpoint only
 LATEST_CKPT=$(ls -d $SCRATCH_OUT/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -1)
 if [ -n "$LATEST_CKPT" ]; then
