@@ -48,6 +48,7 @@ class ArgsConfig:
     weight_decay: float = 1e-5
     warmup_ratio: float = 0.05
     save_steps: int = 5000
+    save_total_limit: int = 2
     gradient_accumulation_steps: int = 1
     dataloader_num_workers: int = 12
     report_to: str = "wandb"
@@ -191,7 +192,7 @@ def main():
         warmup_ratio=config.warmup_ratio,
         lr_scheduler_type="cosine",
         save_steps=config.save_steps,
-        save_total_limit=3,
+        save_total_limit=config.save_total_limit,
         logging_steps=50,
         gradient_accumulation_steps=config.gradient_accumulation_steps,
         dataloader_num_workers=config.dataloader_num_workers,
@@ -214,7 +215,7 @@ def main():
         compute_dtype=compute_dtype,
     )
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
     trainer.save_model(config.output_dir, _internal_call=True)
 
 

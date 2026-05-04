@@ -1,0 +1,100 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=EVAL-RC
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=24:00:00
+#SBATCH --output=slurm_eval_robocasa_%A.out
+
+# usage: sbatch jobs/eval_robocasa.job <checkpoint_dir>
+# example: sbatch jobs/eval_robocasa.job outputs/baseline_robocasa
+
+CHECKPOINT=${1:-outputs/baseline_robocasa}
+PORT=$((5555 + RANDOM % 1000))
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/Isaac-GR00T:$HOME/vla-rscl-simon/robocasa-gr1-tabletop-tasks:$PYTHONPATH
+cd $HOME/vla-rscl-simon
+
+set -a
+source .env
+set +a
+
+RESULTS_DIR="results/$(basename $CHECKPOINT)"
+mkdir -p "$RESULTS_DIR"
+
+echo "=== Evaluating checkpoint: $CHECKPOINT ==="
+echo "=== Results dir: $RESULTS_DIR ==="
+
+# start inference server
+python Isaac-GR00T/scripts/inference_service.py \
+    --model_path "$CHECKPOINT" \
+    --server \
+    --data_config fourier_gr1_arms_waist \
+    --denoising-steps 8 \
+    --port $PORT \
+    --embodiment-tag gr1 &
+
+SERVER_PID=$!
+echo "server started (pid $SERVER_PID), waiting for model load..."
+sleep 90
+
+# all 24 RoboCASA tasks
+TASKS=(
+    "gr1_unified/PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PnPCanToDrawerClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PnPCupToDrawerClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PnPMilkToMicrowaveClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PnPPotatoToMicrowaveClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PnPWineToCabinetClose_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromCuttingboardToBasketSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromCuttingboardToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromCuttingboardToPanSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromCuttingboardToPotSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromCuttingboardToTieredbasketSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlacematToBasketSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlacematToBowlSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlacematToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlacematToTieredshelfSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlateToBowlSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlateToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlateToPanSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromPlateToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromTrayToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromTrayToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromTrayToPotSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromTrayToTieredbasketSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "gr1_unified/PosttrainPnPNovelFromTrayToTieredshelfSplitA_GR1ArmsAndWaistFourierHands_Env"
+)
+
+cd Isaac-GR00T
+for TASK in "${TASKS[@]}"; do
+    TASK_SHORT=$(echo "$TASK" | sed "s|gr1_unified/||" | sed "s|_GR1ArmsAndWaistFourierHands_Env||")
+    echo ""
+    echo "=== Task: $TASK_SHORT ==="
+
+    python scripts/simulation_service.py --client \
+        --env_name "$TASK" \
+        --video_dir "../$RESULTS_DIR/videos/$TASK_SHORT" \
+        --max_episode_steps 720 \
+        --n_episodes 50 \
+        --port $PORT \
+        --headless 2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
+
+    echo "=== Done: $TASK_SHORT ==="
+done
+cd ..
+
+kill $SERVER_PID 2>/dev/null
+echo ""
+echo "=== All 24 tasks evaluated ==="
+echo "Results saved to: $RESULTS_DIR"

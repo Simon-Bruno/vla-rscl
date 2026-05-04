@@ -15,6 +15,14 @@ on two benchmarks:
 - **libero** — 4 task suites (spatial, object, goal, long), single panda arm, ee pose proprio
 - **robocasa-kitchen** — 24 kitchen tasks, gr1 humanoid, joint-space proprio
 
+## snellius env in terminal
+``` bash
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+conda activate rscl
+```
+
 ## setup (snellius)
 
 ```bash
