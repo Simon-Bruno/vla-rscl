@@ -87,7 +87,6 @@ for TASK in "${TASKS[@]}"; do
         --env_name "$TASK" \
         --video_dir "../$RESULTS_DIR/videos/$TASK_SHORT" \
         --max_episode_steps 500 \
-        --n_action_steps 32 \
         --n_envs 4 \
         --n_episodes 20 \
         --port $PORT \
