@@ -86,8 +86,10 @@ for TASK in "${TASKS[@]}"; do
     python scripts/simulation_service.py --client \
         --env_name "$TASK" \
         --video_dir "../$RESULTS_DIR/videos/$TASK_SHORT" \
-        --max_episode_steps 720 \
-        --n_episodes 50 \
+        --max_episode_steps 500 \
+        --n_action_steps 32 \
+        --n_envs 4 \
+        --n_episodes 20 \
         --port $PORT \
         2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
 
