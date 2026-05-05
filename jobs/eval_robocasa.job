@@ -23,6 +23,7 @@ conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$HOME/vla-rscl-simon/vla-rscl/robocasa-gr1-tabletop-tasks:$HOME/vla-rscl-simon/vla-rscl/robosuite:$PYTHONPATH
+export MUJOCO_GL=egl
 cd $HOME/vla-rscl-simon/vla-rscl
 
 set -a
@@ -88,7 +89,7 @@ for TASK in "${TASKS[@]}"; do
         --max_episode_steps 720 \
         --n_episodes 50 \
         --port $PORT \
-        --headless 2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
+        2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
 
     echo "=== Done: $TASK_SHORT ==="
 done
