@@ -6,25 +6,31 @@ def rs_cl_weights(
     proprio: torch.Tensor,
     beta: float = 1.0,
     depth: torch.Tensor = None,
-    alpha: float = 0.5,
     action: torch.Tensor = None,
-    gamma: float = 0.0,
+    w_q: float = 1.0,
+    w_depth: float = 0.0,
+    w_action: float = 0.0,
 ) -> torch.Tensor:
     # soft weights from multi-modal state distances
-    # d(i,j) = (1-gamma) * [alpha * d_q + (1-alpha) * d_depth] + gamma * d_action
-    # set alpha=1.0 to disable depth, gamma=0.0 to disable action
-    q = F.normalize(proprio, dim=-1)
-    dists = alpha * torch.cdist(q, q, p=2)
+    # d(i,j) = w_q*d_q + w_depth*d_depth + w_action*d_action  (auto-normalised)
+    # set a weight to 0.0 to disable that modality
+    dists = torch.zeros(proprio.shape[0], proprio.shape[0], device=proprio.device)
 
-    if depth is not None and alpha < 1.0:
+    total = w_q + (w_depth if depth is not None else 0.0) + (w_action if action is not None else 0.0)
+    if total == 0.0:
+        total = 1.0  # fallback: uniform weights
+
+    if w_q > 0.0:
+        q = F.normalize(proprio, dim=-1)
+        dists = dists + (w_q / total) * torch.cdist(q, q, p=2)
+
+    if depth is not None and w_depth > 0.0:
         d = F.normalize(depth, dim=-1)
-        dists = dists + (1.0 - alpha) * torch.cdist(d, d, p=2)
+        dists = dists + (w_depth / total) * torch.cdist(d, d, p=2)
 
-    dists = (1.0 - gamma) * dists
-
-    if action is not None and gamma > 0.0:
+    if action is not None and w_action > 0.0:
         a = F.normalize(action, dim=-1)
-        dists = dists + gamma * torch.cdist(a, a, p=2)
+        dists = dists + (w_action / total) * torch.cdist(a, a, p=2)
 
     return torch.softmax(-dists / beta, dim=1)
 
@@ -36,18 +42,20 @@ def rs_cl_loss(
     tau: float = 0.2,
     beta: float = 1.0,
     depth: torch.Tensor = None,
-    alpha: float = 0.5,
     action: torch.Tensor = None,
-    gamma: float = 0.0,
+    w_q: float = 1.0,
+    w_depth: float = 0.0,
+    w_action: float = 0.0,
 ) -> torch.Tensor:
-    # infonce with multi-modal soft weights (eq. 3 in paper, extended)
+    # infonce with multi-modal soft weights
     z = F.normalize(z, dim=-1)
     z_aug = F.normalize(z_aug, dim=-1)
 
     logits = z @ z_aug.T / tau
     log_probs = logits - torch.logsumexp(logits, dim=1, keepdim=True)
 
-    w = rs_cl_weights(proprio, beta=beta, depth=depth, alpha=alpha, action=action, gamma=gamma)
+    w = rs_cl_weights(proprio, beta=beta, depth=depth, action=action,
+                      w_q=w_q, w_depth=w_depth, w_action=w_action)
     return -(w * log_probs).sum(dim=1).mean()
 
 

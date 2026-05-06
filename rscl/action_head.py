@@ -19,8 +19,9 @@ class RSCLConfig:
     contrastive_loss: str = "rscl"  # "none", "vanilla_infonce", "rscl"
     tau: float = 0.2
     beta: float = 1.0
-    alpha: float = 0.5   # blend: alpha * d_proprio + (1-alpha) * d_depth  (set 1.0 to disable depth)
-    gamma: float = 0.0   # action weight: (1-gamma)*[alpha*d_q+(1-alpha)*d_dep] + gamma*d_action (0=off)
+    w_q: float = 1.0      # proprio distance weight (0.0 = off)
+    w_depth: float = 0.0  # depth distance weight   (0.0 = off)
+    w_action: float = 0.0 # action distance weight  (0.0 = off)
     lambda_init: float = 1.0  # cosine decayed to 0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -186,8 +187,8 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             z_aug = backbone_output["_rscl_z_aug"]
             proprio = action_input.state[:, 0, :]  # first timestep, (B, 64)
             depth = action_input.get("depth_map", None)   # (B, 64) or None, disabled by alpha=1.0
-            # first action timestep (B, 32), analogous to state[:, 0, :]; disabled when gamma=0.0
-            action_mean = actions[:, 0, :] if self.rscl_config.gamma > 0.0 else None
+            # first action timestep (B, 32), analogous to state[:, 0, :]; None when weight=0
+            action_step = actions[:, 0, :] if self.rscl_config.w_action > 0.0 else None
 
             if self.rscl_config.contrastive_loss == "vanilla_infonce":
                 cl_loss_val = vanilla_infonce_loss(z, z_aug, tau=self.rscl_config.tau)
@@ -197,9 +198,10 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
                     tau=self.rscl_config.tau,
                     beta=self.rscl_config.beta,
                     depth=depth,
-                    alpha=self.rscl_config.alpha,
-                    action=action_mean,
-                    gamma=self.rscl_config.gamma,
+                    action=action_step,
+                    w_q=self.rscl_config.w_q,
+                    w_depth=self.rscl_config.w_depth,
+                    w_action=self.rscl_config.w_action,
                 )
 
             lam = getattr(self, "_current_lambda", self.rscl_config.lambda_init)
