@@ -35,7 +35,7 @@ class ArgsConfig:
     # dataset
     dataset_path: List[str] = None
     output_dir: str = "./outputs"
-    data_config: str = "examples.Libero.custom_data_config:LiberoDataConfig"
+    data_config: str = "fourier_gr1_arms_waist"
 
     # model
     base_model_path: str = "nvidia/GR00T-N1.5-3B"
