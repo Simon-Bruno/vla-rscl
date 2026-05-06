@@ -186,8 +186,8 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             z_aug = backbone_output["_rscl_z_aug"]
             proprio = action_input.state[:, 0, :]  # first timestep, (B, 64)
             depth = action_input.get("depth_map", None)   # (B, 64) or None, disabled by alpha=1.0
-            # mean over 16-step horizon -> (B, 32); disabled when gamma=0.0
-            action_mean = actions.mean(dim=1) if self.rscl_config.gamma > 0.0 else None
+            # first action timestep (B, 32), analogous to state[:, 0, :]; disabled when gamma=0.0
+            action_mean = actions[:, 0, :] if self.rscl_config.gamma > 0.0 else None
 
             if self.rscl_config.contrastive_loss == "vanilla_infonce":
                 cl_loss_val = vanilla_infonce_loss(z, z_aug, tau=self.rscl_config.tau)
