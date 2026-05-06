@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Literal
 
+import cv2
+import numpy as np
 import torch
+import torch.nn.functional as F
 import tyro
 from transformers import TrainingArguments
 
@@ -142,6 +145,33 @@ def main():
 
     # create datasets — for multiple paths, build a mixture
     from gr00t.data.dataset import LeRobotMixtureDataset
+
+    class DepthAugmentedDataset(torch.utils.data.Dataset):
+        """wraps a LeRobotSingleDataset and adds depth_map (64-d pooled float32) to each item.
+        depth PNGs are loaded from {dataset_path}/depth_maps/episode_XXXXXX_NNNNNN.png"""
+        def __init__(self, dataset, dataset_path: Path):
+            self._dataset = dataset
+            self._depth_root = Path(dataset_path) / "depth_maps"
+
+        def __len__(self):
+            return len(self._dataset)
+
+        def __getitem__(self, idx):
+            item = self._dataset[idx]
+            trajectory_id, base_index = self._dataset.all_steps[idx]
+            depth_path = self._depth_root / f"episode_{trajectory_id:06d}_{base_index:06d}.png"
+            if depth_path.exists():
+                gray = cv2.imread(str(depth_path), cv2.IMREAD_GRAYSCALE)  # (H, W) uint8
+                depth_t = torch.from_numpy(gray).float() / 255.0          # (H, W)
+                depth_t = F.adaptive_avg_pool2d(depth_t.unsqueeze(0).unsqueeze(0), (8, 8))
+                item["depth_map"] = depth_t.squeeze().flatten()            # (64,)
+            else:
+                item["depth_map"] = torch.zeros(64)
+            return item
+
+        def __getattr__(self, name):
+            return getattr(self._dataset, name)
+
     datasets = []
     for path in config.dataset_path:
         ds = LeRobotSingleDataset(
@@ -151,6 +181,7 @@ def main():
             embodiment_tag=config.embodiment_tag,
             video_backend=config.video_backend,
         )
+        ds = DepthAugmentedDataset(ds, path)
         datasets.append(ds)
 
     # subsample to match paper's demo budget (e.g. 300 total across all tasks)
