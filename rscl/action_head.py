@@ -19,7 +19,8 @@ class RSCLConfig:
     contrastive_loss: str = "rscl"  # "none", "vanilla_infonce", "rscl"
     tau: float = 0.2
     beta: float = 1.0
-    alpha: float = 0.5  # blend weight: alpha * proprio_dist + (1-alpha) * depth_dist
+    alpha: float = 0.5   # blend: alpha * d_proprio + (1-alpha) * d_depth  (set 1.0 to disable depth)
+    gamma: float = 0.0   # action weight: (1-gamma)*[alpha*d_q+(1-alpha)*d_dep] + gamma*d_action (0=off)
     lambda_init: float = 1.0  # cosine decayed to 0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -183,8 +184,10 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         if self.rscl_config.contrastive_loss != "none" and "_rscl_z" in backbone_output:
             z = backbone_output["_rscl_z"]
             z_aug = backbone_output["_rscl_z_aug"]
-            proprio = action_input.state[:, 0, :]  # first timestep
-            depth = action_input.get("depth_map", None)  # (B, 64) or None
+            proprio = action_input.state[:, 0, :]  # first timestep, (B, 64)
+            depth = action_input.get("depth_map", None)   # (B, 64) or None, disabled by alpha=1.0
+            # mean over 16-step horizon -> (B, 32); disabled when gamma=0.0
+            action_mean = actions.mean(dim=1) if self.rscl_config.gamma > 0.0 else None
 
             if self.rscl_config.contrastive_loss == "vanilla_infonce":
                 cl_loss_val = vanilla_infonce_loss(z, z_aug, tau=self.rscl_config.tau)
@@ -195,6 +198,8 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
                     beta=self.rscl_config.beta,
                     depth=depth,
                     alpha=self.rscl_config.alpha,
+                    action=action_mean,
+                    gamma=self.rscl_config.gamma,
                 )
 
             lam = getattr(self, "_current_lambda", self.rscl_config.lambda_init)

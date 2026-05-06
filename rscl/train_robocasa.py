@@ -60,7 +60,8 @@ class ArgsConfig:
     contrastive_loss: str = "rscl"  # "none", "vanilla_infonce", "rscl"
     tau: float = 0.2
     beta: float = 1.0
-    alpha: float = 0.5  # blend: alpha * proprio_dist + (1-alpha) * depth_dist
+    alpha: float = 0.5   # depth blend: alpha*d_q + (1-alpha)*d_depth  (1.0 = depth off)
+    gamma: float = 0.0   # action weight  (0.0 = action off)
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -114,6 +115,7 @@ def main():
         tau=config.tau,
         beta=config.beta,
         alpha=config.alpha,
+        gamma=config.gamma,
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
