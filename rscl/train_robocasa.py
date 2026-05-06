@@ -71,6 +71,7 @@ class ArgsConfig:
     max_demos_total: int = None  # limit total demos across all tasks (e.g. 300 to match paper)
 
     seed: int = 0
+    resume_from_checkpoint: str = None  # path to checkpoint dir to resume from
 
 
 class RSCLTrainer(DualBrainTrainer):
@@ -291,7 +292,7 @@ def main():
     with open(exp_cfg_dir / "metadata.json", "w") as f:
         _json.dump(metadata_json, f, indent=4)
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
     trainer.save_model(config.output_dir, _internal_call=True)
 
 
