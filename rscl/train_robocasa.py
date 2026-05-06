@@ -64,6 +64,7 @@ class ArgsConfig:
     # data
     embodiment_tag: str = "new_embodiment"
     video_backend: str = "torchcodec"
+    max_demos_total: int = None  # limit total demos across all tasks (e.g. 300 to match paper)
 
     seed: int = 0
 
@@ -152,6 +153,33 @@ def main():
         )
         datasets.append(ds)
 
+    # subsample to match paper's demo budget (e.g. 300 total across all tasks)
+    # uses an episode-level wrapper that keeps trajectory_lengths correct so
+    # LeRobotMixtureDataset can access it (plain Subset doesn't proxy attributes)
+    if config.max_demos_total is not None:
+        import numpy as np
+
+        class EpisodeLimitedDataset(torch.utils.data.Dataset):
+            """takes first n_episodes from a LeRobotSingleDataset, exposing correct trajectory_lengths."""
+            def __init__(self, dataset, n_episodes: int):
+                self._dataset = dataset
+                n = min(n_episodes, len(dataset.trajectory_lengths))
+                self.trajectory_lengths = dataset.trajectory_lengths[:n]
+                self.trajectory_ids = dataset.trajectory_ids[:n]
+                self._total_steps = int(self.trajectory_lengths.sum())
+            def __len__(self):
+                return self._total_steps
+            def __getitem__(self, idx):
+                return self._dataset[idx]
+            def __getattr__(self, name):
+                return getattr(self._dataset, name)
+
+        num_tasks = len(datasets)
+        demos_per_task = config.max_demos_total // num_tasks
+        datasets = [EpisodeLimitedDataset(ds, demos_per_task) for ds in datasets]
+        actual = sum(len(ds.trajectory_lengths) for ds in datasets)
+        print(f"[demo limit] {demos_per_task} episodes/task, {actual} total episodes")
+
     if len(datasets) == 1:
         dataset = RobustDataset(datasets[0])
     else:
@@ -230,7 +258,7 @@ def main():
     with open(exp_cfg_dir / "metadata.json", "w") as f:
         _json.dump(metadata_json, f, indent=4)
 
-    trainer.train(resume_from_checkpoint=True)
+    trainer.train()
     trainer.save_model(config.output_dir, _internal_call=True)
 
 

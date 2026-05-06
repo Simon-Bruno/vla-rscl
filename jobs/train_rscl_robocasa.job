@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=48:00:00
-#SBATCH --output=slurm_rscl_robocasa_%A.out
+#SBATCH --output=slurm_rscl_robocasa_300_%A.out
 
 module purge
 module load 2025
@@ -23,8 +23,8 @@ set -a
 source .env
 set +a
 
-SCRATCH_OUT=/scratch-shared/scur0198/outputs/rscl_robocasa
-HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/rscl_robocasa
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/rscl_robocasa_300
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/rscl_robocasa_300
 mkdir -p $SCRATCH_OUT
 
 # copy existing checkpoint to scratch for resume
@@ -38,7 +38,22 @@ for d in "$DATA_ROOT"/*_1000; do
     [ -d "$d" ] && DATASET_PATHS+=("$d")
 done
 
-python -m rscl.train_robocasa     --dataset_path "${DATASET_PATHS[@]}"     --output_dir $SCRATCH_OUT     --data_config fourier_gr1_arms_waist     --embodiment_tag gr1     --tune_visual     --contrastive_loss rscl     --tau 0.2     --beta 1.0     --max_steps 60000     --batch_size 8     --learning_rate 3e-5     --gradient_accumulation_steps 4     --save_steps 5000     --save_total_limit 2     --video_backend torchvision_av     --seed 0
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir $SCRATCH_OUT \
+    --data_config fourier_gr1_arms_waist \
+    --tune_visual \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 1.0 \
+    --max_steps 60000 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 8 \
+    --save_steps 5000 \
+    --save_total_limit 2 \
+    --max_demos_total 300 \
+    --video_backend torchvision_av \
+    --seed 0
 
 # copy final model + latest checkpoint back to home
 echo "Copying results back to home..."

@@ -43,7 +43,7 @@ python Isaac-GR00T/scripts/inference_service.py \
     --data_config fourier_gr1_arms_waist \
     --denoising-steps 8 \
     --port $PORT \
-    --embodiment-tag gr1 &
+    --embodiment-tag new_embodiment &
 
 SERVER_PID=$!
 echo "server started (pid $SERVER_PID), waiting for model load..."
@@ -88,7 +88,7 @@ for TASK in "${TASKS[@]}"; do
         --video_dir "../$RESULTS_DIR/videos/$TASK_SHORT" \
         --max_episode_steps 500 \
         --n_envs 4 \
-        --n_episodes 20 \
+        --n_episodes 50 \
         --port $PORT \
         2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
 
