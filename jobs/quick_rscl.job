@@ -16,7 +16,6 @@ module load FFmpeg/7.1.1-GCCcore-14.2.0
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
-export HF_HUB_OFFLINE=1
 export TQDM_DISABLE=1
 export WANDB_DIR=/scratch-shared/scur0198
 cd $HOME/vla-rscl
