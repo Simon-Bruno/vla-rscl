@@ -29,20 +29,35 @@ class RSCLConfig:
 
 
 class ViewCutoff(nn.Module):
-    # masks out one camera view's token slice as augmentation
+    # masks out one camera view's image tokens using actual positions from backbone
     def __init__(self, n_views: int = 2, tokens_per_view: int = 256):
         super().__init__()
         self.n_views = n_views
         self.tokens_per_view = tokens_per_view
 
-    def forward(self, features: torch.Tensor) -> torch.Tensor:
+    def forward(self, features: torch.Tensor, image_token_mask: torch.Tensor = None) -> torch.Tensor:
         if not self.training:
             return features
         h = features.clone()
-        view_idx = torch.randint(0, self.n_views, (1,)).item()
-        start = view_idx * self.tokens_per_view
-        end = start + self.tokens_per_view
-        h[:, start:end, :] = 0.0
+        if image_token_mask is not None:
+            # use actual image token positions from backbone
+            # split image tokens into n_views contiguous groups and mask one
+            view_idx = torch.randint(0, self.n_views, (1,)).item()
+            for b in range(h.shape[0]):
+                img_positions = image_token_mask[b].nonzero(as_tuple=True)[0]
+                if len(img_positions) == 0:
+                    continue
+                chunk_size = len(img_positions) // self.n_views
+                start = view_idx * chunk_size
+                end = min(start + chunk_size, len(img_positions))
+                positions_to_mask = img_positions[start:end]
+                h[b, positions_to_mask, :] = 0.0
+        else:
+            # fallback: fixed position masking
+            view_idx = torch.randint(0, self.n_views, (1,)).item()
+            start = view_idx * self.tokens_per_view
+            end = start + self.tokens_per_view
+            h[:, start:end, :] = 0.0
         return h
 
 
@@ -110,7 +125,8 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         # augmented path (view cutoff -> re-run adapter)
         # detach raw_features to avoid double-gradients into backbone,
         # but do NOT use no_grad — summary_token needs gradients from augmented path too
-        augmented = self.view_cutoff(raw_features.detach())
+        image_mask = backbone_output.get("image_token_mask", None)
+        augmented = self.view_cutoff(raw_features.detach(), image_mask)
         _, w_aug = self._adapt_with_summary(augmented)
         z_aug = self.projector(w_aug)
 
@@ -118,16 +134,17 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         backbone_output["_rscl_z"] = z
         backbone_output["_rscl_z_aug"] = z_aug
 
-        # diagnostic: print token count and augmentation effect every 1000 forward calls
+        # diagnostic: print token layout and augmentation effect
         if not hasattr(self, '_fwd_count'):
             self._fwd_count = 0
         self._fwd_count += 1
-        if self._fwd_count % 1000 == 1:
+        if self._fwd_count % 500 == 1:
             with torch.no_grad():
                 cos_sim = torch.nn.functional.cosine_similarity(z, z_aug, dim=-1).mean()
                 n_masked = (augmented != raw_features).any(dim=-1).sum() / raw_features.shape[0]
-                print(f"[diag] seq_len={raw_features.shape[1]}, tokens_masked={n_masked:.0f}/{raw_features.shape[1]}, "
-                      f"cos_sim(z,z_aug)={cos_sim:.4f}", flush=True)
+                n_img = image_mask[0].sum().item() if image_mask is not None else -1
+                print(f"[diag] seq_len={raw_features.shape[1]}, img_tokens={n_img}, "
+                      f"masked={n_masked:.0f}, cos(z,z_aug)={cos_sim:.4f}", flush=True)
 
         return backbone_output
 
