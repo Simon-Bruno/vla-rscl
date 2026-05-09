@@ -1,12 +1,12 @@
 #!/bin/bash
-# quick RS-CL: 1 LIBERO suite, 10K steps, ~3-4h
+# quick RS-CL: 1 LIBERO suite, 20K steps, ~6-8h
 
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
 #SBATCH --job-name=Q-RSCL
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=/scratch-shared/scur0198/slurm_quick_rscl_%A.out
 
 module purge
@@ -30,7 +30,7 @@ python -m rscl.train \
     --contrastive_loss rscl \
     --tau 0.2 \
     --beta 1.0 \
-    --max_steps 10000 \
+    --max_steps 20000 \
     --batch_size 32 \
     --save_steps 5000 \
     --video_backend torchvision_av \

@@ -1,12 +1,12 @@
 #!/bin/bash
-# quick baseline: 1 LIBERO suite, 10K steps, ~3-4h
+# quick baseline: 1 LIBERO suite, 20K steps, ~6-8h
 
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
 #SBATCH --job-name=Q-Base
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=06:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=/scratch-shared/scur0198/slurm_quick_baseline_%A.out
 
 module purge
@@ -28,7 +28,7 @@ python -m rscl.train \
         data/libero/libero_spatial_no_noops_1.0.0_lerobot \
     --output_dir /scratch-shared/scur0198/outputs/quick_baseline \
     --contrastive_loss none \
-    --max_steps 10000 \
+    --max_steps 20000 \
     --batch_size 32 \
     --save_steps 5000 \
     --video_backend torchvision_av \

@@ -1,5 +1,5 @@
 #!/bin/bash
-# quick eval: 1 LIBERO suite, 20 trials/task, ~30min
+# quick eval: 1 LIBERO suite, 30 trials/task, ~45min
 
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
@@ -48,7 +48,7 @@ sleep 60
 cd Isaac-GR00T
 python -m examples.Libero.eval.run_libero_eval \
     --task_suite_name "$SUITE" \
-    --num_trials_per_task 20 \
+    --num_trials_per_task 30 \
     --port $PORT \
     --headless
 cd ..
