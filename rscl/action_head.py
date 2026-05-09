@@ -118,6 +118,17 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         backbone_output["_rscl_z"] = z
         backbone_output["_rscl_z_aug"] = z_aug
 
+        # diagnostic: print token count and augmentation effect every 1000 forward calls
+        if not hasattr(self, '_fwd_count'):
+            self._fwd_count = 0
+        self._fwd_count += 1
+        if self._fwd_count % 1000 == 1:
+            with torch.no_grad():
+                cos_sim = torch.nn.functional.cosine_similarity(z, z_aug, dim=-1).mean()
+                n_masked = (augmented != raw_features).any(dim=-1).sum() / raw_features.shape[0]
+                print(f"[diag] seq_len={raw_features.shape[1]}, tokens_masked={n_masked:.0f}/{raw_features.shape[1]}, "
+                      f"cos_sim(z,z_aug)={cos_sim:.4f}", flush=True)
+
         return backbone_output
 
     def forward(self, backbone_output: BatchFeature, action_input: BatchFeature) -> BatchFeature:
