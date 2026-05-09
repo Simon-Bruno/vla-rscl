@@ -25,8 +25,14 @@ def rs_cl_weights(
         dists = dists + (w_q / total) * torch.cdist(q, q, p=2)
 
     if depth is not None and w_depth > 0.0:
-        d = F.normalize(depth, dim=-1)
-        dists = dists + (w_depth / total) * torch.cdist(d, d, p=2)
+        # mask out samples where depth is all-zero (missing depth PNG -> fallback zeros)
+        # so they don't spuriously attract each other in the distance matrix
+        has_depth = (depth.norm(dim=-1) > 1e-6)  # (B,)
+        if has_depth.any():
+            d = F.normalize(depth, dim=-1)
+            dist_d = torch.cdist(d, d, p=2)
+            mask = has_depth.float().unsqueeze(1) * has_depth.float().unsqueeze(0)
+            dists = dists + (w_depth / total) * dist_d * mask
 
     if action is not None and w_action > 0.0:
         a = F.normalize(action, dim=-1)

@@ -66,11 +66,13 @@ class ArgsConfig:
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
+    n_views: int = 2
+    tokens_per_view: int = 128  # 1 camera, 256 tokens split into 2 virtual views
 
     # data
     embodiment_tag: str = "new_embodiment"
     video_backend: str = "torchcodec"
-    max_demos_total: int = None  # limit total demos across all tasks (e.g. 300 to match paper)
+    max_demos_per_task: int = None  # demos per task (paper uses 30, 100, 300 per task)
 
     seed: int = 0
     resume_from_checkpoint: str = None  # path to checkpoint dir to resume from
@@ -121,6 +123,8 @@ def main():
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
+        n_views=config.n_views,
+        tokens_per_view=config.tokens_per_view,
     )
 
     # load data config (libero-specific transforms and normalization)
@@ -191,11 +195,10 @@ def main():
         ds = DepthAugmentedDataset(ds, path)
         datasets.append(ds)
 
-    # subsample to match paper's demo budget (e.g. 300 total across all tasks)
+    # subsample to match paper's demo budget — paper reports 30/100/300 demos *per task*
     # uses an episode-level wrapper that keeps trajectory_lengths correct so
     # LeRobotMixtureDataset can access it (plain Subset doesn't proxy attributes)
-    if config.max_demos_total is not None:
-        import numpy as np
+    if config.max_demos_per_task is not None:
 
         class EpisodeLimitedDataset(torch.utils.data.Dataset):
             """takes first n_episodes from a LeRobotSingleDataset, exposing correct trajectory_lengths."""
@@ -212,11 +215,9 @@ def main():
             def __getattr__(self, name):
                 return getattr(self._dataset, name)
 
-        num_tasks = len(datasets)
-        demos_per_task = config.max_demos_total // num_tasks
-        datasets = [EpisodeLimitedDataset(ds, demos_per_task) for ds in datasets]
+        datasets = [EpisodeLimitedDataset(ds, config.max_demos_per_task) for ds in datasets]
         actual = sum(len(ds.trajectory_lengths) for ds in datasets)
-        print(f"[demo limit] {demos_per_task} episodes/task, {actual} total episodes")
+        print(f"[demo limit] {config.max_demos_per_task} episodes/task, {actual} total episodes")
 
     if len(datasets) == 1:
         dataset = RobustDataset(datasets[0])
@@ -270,6 +271,23 @@ def main():
     )
 
     from gr00t.model.transforms import DefaultDataCollator
+
+    class RSCLDataCollator(DefaultDataCollator):
+        # DefaultDataCollator uses torch.from_numpy(np.stack(values)) for all non-special keys.
+        # that works for numpy arrays (state, action) but is fragile for torch.Tensor values
+        # like depth_map. extract tensor keys first, stack them cleanly, then let the parent
+        # handle the remaining numpy-array keys.
+        def __call__(self, features):
+            tensor_keys = {
+                k: torch.stack([f[k] for f in features])
+                for k in features[0]
+                if isinstance(features[0][k], torch.Tensor)
+            }
+            stripped = [{k: v for k, v in f.items() if k not in tensor_keys} for f in features]
+            batch = super().__call__(stripped)
+            batch.update(tensor_keys)
+            return batch
+
     compute_dtype = torch.bfloat16 if training_args.bf16 else torch.float32
     trainer = RSCLTrainer(
         rscl_config=rscl_config,
@@ -277,7 +295,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=dataset,
-        data_collator=DefaultDataCollator(),
+        data_collator=RSCLDataCollator(),
         compute_dtype=compute_dtype,
     )
 

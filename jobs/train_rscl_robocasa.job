@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu_a100
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=RSCL-RC
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=48:00:00
-#SBATCH --output=slurm_rscl_robocasa_300_%A.out
+#SBATCH --time=16:00:00
+#SBATCH --output=slurm_rscl_robocasa_30_%A.out
 
 module purge
 module load 2025
@@ -23,14 +23,9 @@ set -a
 source .env
 set +a
 
-SCRATCH_OUT=/scratch-shared/scur0198/outputs/rscl_robocasa_300
-HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/rscl_robocasa_300
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/rscl_robocasa_30
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/rscl_robocasa_30
 mkdir -p $SCRATCH_OUT
-
-# copy existing checkpoint to scratch for resume
-if [ -d "$HOME_OUT" ]; then
-    cp -r $HOME_OUT/* $SCRATCH_OUT/ 2>/dev/null || true
-fi
 
 DATA_ROOT=data/robocasa
 DATASET_PATHS=()
@@ -45,23 +40,21 @@ python -m rscl.train_robocasa \
     --tune_visual \
     --contrastive_loss rscl \
     --tau 0.2 \
-    --beta 1.0 \
-    --max_steps 60000 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --max_steps 30000 \
     --batch_size 8 \
     --gradient_accumulation_steps 8 \
     --save_steps 5000 \
     --save_total_limit 2 \
-    --max_demos_total 300 \
+    --max_demos_per_task 30 \
     --video_backend torchvision_av \
     --seed 0
 
-# copy final model + latest checkpoint back to home
 echo "Copying results back to home..."
 mkdir -p $HOME_OUT
-# copy final model files (non-checkpoint)
 cp $SCRATCH_OUT/*.safetensors $SCRATCH_OUT/*.json $HOME_OUT/ 2>/dev/null || true
 cp -r $SCRATCH_OUT/experiment_cfg $HOME_OUT/ 2>/dev/null || true
-# copy the last checkpoint only
 LATEST_CKPT=$(ls -d $SCRATCH_OUT/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -1)
 if [ -n "$LATEST_CKPT" ]; then
     cp -r "$LATEST_CKPT" $HOME_OUT/

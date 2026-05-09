@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=12:00:00
-#SBATCH --output=slurm_eval_%A.out
+#SBATCH --output=/scratch-shared/scur0198/slurm_eval_%A.out
 
 # usage: sbatch jobs/eval.job <checkpoint_dir> [suite]
 # example: sbatch jobs/eval.job outputs/baseline libero_spatial

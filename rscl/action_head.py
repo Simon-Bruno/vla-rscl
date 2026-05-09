@@ -1,5 +1,4 @@
 import math
-import random
 from dataclasses import dataclass, field
 
 import torch
@@ -26,12 +25,12 @@ class RSCLConfig:
     proj_hidden: int = 2048
     proj_dim: int = 128
     n_views: int = 2
-    tokens_per_view: int = 64  # groot n1.5 uses pixel shuffle -> 64 tokens/view
+    tokens_per_view: int = 256  # groot n1.5 nops: 256 tokens per camera view
 
 
 class ViewCutoff(nn.Module):
     # masks out one camera view's token slice as augmentation
-    def __init__(self, n_views: int = 2, tokens_per_view: int = 64):
+    def __init__(self, n_views: int = 2, tokens_per_view: int = 256):
         super().__init__()
         self.n_views = n_views
         self.tokens_per_view = tokens_per_view
@@ -40,7 +39,7 @@ class ViewCutoff(nn.Module):
         if not self.training:
             return features
         h = features.clone()
-        view_idx = random.randint(0, self.n_views - 1)
+        view_idx = torch.randint(0, self.n_views, (1,)).item()
         start = view_idx * self.tokens_per_view
         end = start + self.tokens_per_view
         h[:, start:end, :] = 0.0
@@ -108,10 +107,11 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         h, w = self._adapt_with_summary(raw_features)
         z = self.projector(w)
 
-        # augmented path (view cutoff -> re-run adapter, no grad to save memory)
+        # augmented path (view cutoff -> re-run adapter)
+        # detach raw_features to avoid double-gradients into backbone,
+        # but do NOT use no_grad — summary_token needs gradients from augmented path too
         augmented = self.view_cutoff(raw_features.detach())
-        with torch.no_grad():
-            _, w_aug = self._adapt_with_summary(augmented)
+        _, w_aug = self._adapt_with_summary(augmented)
         z_aug = self.projector(w_aug)
 
         backbone_output["backbone_features"] = h

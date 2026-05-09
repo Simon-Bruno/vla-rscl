@@ -60,6 +60,8 @@ class ArgsConfig:
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
+    n_views: int = 2
+    tokens_per_view: int = 256  # 256 tokens per camera (groot n1.5 nops)
 
     # data
     embodiment_tag: str = "new_embodiment"
@@ -107,6 +109,8 @@ def main():
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
+        n_views=config.n_views,
+        tokens_per_view=config.tokens_per_view,
     )
 
     # load data config (libero-specific transforms and normalization)

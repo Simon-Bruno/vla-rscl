@@ -1,12 +1,17 @@
 #!/bin/bash
+# RS-CL with DiT UNFROZEN — matches paper setup (tune_visual + tune_diffusion_model)
+# Compare against:
+#   ablation_baseline_30d     = no CL,  frozen DiT
+#   ablation_rscl_30d         = RS-CL,  frozen DiT  (performs badly ~7%)
+#   ablation_rscl_tunedit_30d = RS-CL,  unfrozen DiT (this job, paper-matching)
 
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
-#SBATCH --job-name=BASE-RC
+#SBATCH --job-name=rscl-tunedit
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=16:00:00
-#SBATCH --output=slurm_baseline_robocasa_30_%A.out
+#SBATCH --time=30:00:00
+#SBATCH --output=/scratch-shared/scur0198/slurm_ablation_rscl_tunedit_%A.out
 
 module purge
 module load 2025
@@ -17,14 +22,17 @@ conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+export HF_HUB_OFFLINE=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
 cd $HOME/vla-rscl-simon/vla-rscl
 
 set -a
 source .env
 set +a
 
-SCRATCH_OUT=/scratch-shared/scur0198/outputs/baseline_robocasa_30
-HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/baseline_robocasa_30
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/ablation_rscl_tunedit_30d
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/ablation_rscl_tunedit_30d
 mkdir -p $SCRATCH_OUT
 
 DATA_ROOT=data/robocasa
@@ -38,8 +46,13 @@ python -m rscl.train_robocasa \
     --output_dir $SCRATCH_OUT \
     --data_config fourier_gr1_arms_waist \
     --tune_visual \
-    --contrastive_loss none \
-    --max_steps 30000 \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 1.0 \
+    --w_q 1.0 \
+    --w_depth 0.0 \
+    --w_action 0.0 \
+    --max_steps 60000 \
     --batch_size 8 \
     --gradient_accumulation_steps 8 \
     --save_steps 5000 \
@@ -55,5 +68,6 @@ cp -r $SCRATCH_OUT/experiment_cfg $HOME_OUT/ 2>/dev/null || true
 LATEST_CKPT=$(ls -d $SCRATCH_OUT/checkpoint-* 2>/dev/null | sort -t- -k2 -n | tail -1)
 if [ -n "$LATEST_CKPT" ]; then
     cp -r "$LATEST_CKPT" $HOME_OUT/
+    cp -r $SCRATCH_OUT/experiment_cfg $HOME_OUT/$(basename $LATEST_CKPT)/ 2>/dev/null || true
 fi
 echo "Done. Results in $HOME_OUT"

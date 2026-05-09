@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=24:00:00
-#SBATCH --output=slurm_eval_robocasa_%A.out
+#SBATCH --output=/scratch-shared/scur0198/slurm_eval_robocasa_%A.out
 
 # usage: sbatch jobs/eval_robocasa.job <checkpoint_dir>
 # example: sbatch jobs/eval_robocasa.job outputs/baseline_robocasa
@@ -30,7 +30,9 @@ set -a
 source .env
 set +a
 
-RESULTS_DIR="results/$(basename $CHECKPOINT)"
+RUN_NAME=$(basename $(dirname $CHECKPOINT))
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+RESULTS_DIR="/scratch-shared/scur0198/results/${RUN_NAME}_${TIMESTAMP}"
 mkdir -p "$RESULTS_DIR"
 
 echo "=== Evaluating checkpoint: $CHECKPOINT ==="
@@ -85,12 +87,11 @@ for TASK in "${TASKS[@]}"; do
 
     python scripts/simulation_service.py --client \
         --env_name "$TASK" \
-        --video_dir "../$RESULTS_DIR/videos/$TASK_SHORT" \
         --max_episode_steps 500 \
         --n_envs 4 \
         --n_episodes 50 \
         --port $PORT \
-        2>&1 | tee "../$RESULTS_DIR/${TASK_SHORT}.log"
+        2>&1 | tee "$RESULTS_DIR/${TASK_SHORT}.log"
 
     echo "=== Done: $TASK_SHORT ==="
 done
@@ -100,3 +101,9 @@ kill $SERVER_PID 2>/dev/null
 echo ""
 echo "=== All 24 tasks evaluated ==="
 echo "Results saved to: $RESULTS_DIR"
+
+# copy results back to home
+HOME_RESULTS=$HOME/vla-rscl-simon/vla-rscl/results/${RUN_NAME}_${TIMESTAMP}
+mkdir -p $HOME_RESULTS
+cp $RESULTS_DIR/*.log $HOME_RESULTS/ 2>/dev/null || true
+echo "Logs copied to: $HOME_RESULTS"

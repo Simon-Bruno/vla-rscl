@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=48:00:00
-#SBATCH --output=slurm_baseline_%A.out
+#SBATCH --output=/scratch-shared/scur0198/slurm_baseline_%A.out
 
 module purge
 module load 2025
@@ -19,13 +19,17 @@ cd $HOME/vla-rscl
 
 if [ -f .env ]; then set -a; source .env; set +a; fi
 
+export HF_HUB_OFFLINE=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
+
 python -m rscl.train \
     --dataset_path \
         data/libero/libero_spatial_no_noops_1.0.0_lerobot \
         data/libero/libero_object_no_noops_1.0.0_lerobot \
         data/libero/libero_goal_no_noops_1.0.0_lerobot \
         data/libero/libero_10_no_noops_1.0.0_lerobot \
-    --output_dir outputs/baseline \
+    --output_dir /scratch-shared/scur0198/outputs/libero_baseline \
     --contrastive_loss none \
     --max_steps 60000 \
     --batch_size 32 \
