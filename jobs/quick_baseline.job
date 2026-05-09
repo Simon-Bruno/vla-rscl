@@ -1,0 +1,35 @@
+#!/bin/bash
+# quick baseline: 1 LIBERO suite, 10K steps, ~3-4h
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Q-Base
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=06:00:00
+#SBATCH --output=/scratch-shared/scur0198/slurm_quick_baseline_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+export HF_HUB_OFFLINE=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
+cd $HOME/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+python -m rscl.train \
+    --dataset_path \
+        data/libero/libero_spatial_no_noops_1.0.0_lerobot \
+    --output_dir /scratch-shared/scur0198/outputs/quick_baseline \
+    --contrastive_loss none \
+    --max_steps 10000 \
+    --batch_size 32 \
+    --save_steps 5000 \
+    --video_backend torchvision_av \
+    --seed 0
