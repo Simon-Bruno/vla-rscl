@@ -133,6 +133,7 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         backbone_output["backbone_features"] = h
         backbone_output["_rscl_z"] = z
         backbone_output["_rscl_z_aug"] = z_aug
+        backbone_output["_rscl_w"] = w  # summary token output for proprio alignment tracking
 
         # diagnostic: print token layout and augmentation effect
         if not hasattr(self, '_fwd_count'):
@@ -235,10 +236,26 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             lam = getattr(self, "_current_lambda", self.rscl_config.lambda_init)
             total_loss = fm_loss + lam * cl_loss_val
 
+        # measure h-proprio alignment (proxy for CKNNA)
+        h_proprio_corr = torch.tensor(0.0, device=device)
+        if "_rscl_w" in backbone_output:
+            with torch.no_grad():
+                w_rep = backbone_output["_rscl_w"]  # (B, d_model)
+                q = action_input.state[:, 0, :]      # (B, 64)
+                if w_rep.shape[0] > 4:  # need enough samples
+                    dist_w = torch.cdist(w_rep.float(), w_rep.float(), p=2).flatten()
+                    dist_q = torch.cdist(q.float(), q.float(), p=2).flatten()
+                    # pearson correlation between pairwise distances
+                    dist_w = dist_w - dist_w.mean()
+                    dist_q = dist_q - dist_q.mean()
+                    denom = dist_w.norm() * dist_q.norm()
+                    h_proprio_corr = (dist_w * dist_q).sum() / denom.clamp(min=1e-8)
+
         output_dict = {
             "loss": total_loss,
             "fm_loss": fm_loss.detach(),
             "cl_loss": cl_loss_val.detach(),
+            "h_proprio_corr": h_proprio_corr.detach(),
         }
         return BatchFeature(data=output_dict)
 

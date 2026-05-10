@@ -100,10 +100,11 @@ class RSCLTrainer(DualBrainTrainer):
         # log contrastive metrics to wandb
         fm = outputs.get("fm_loss", torch.tensor(0.0))
         cl = outputs.get("cl_loss", torch.tensor(0.0))
-        self.log({"fm_loss": fm.item(), "cl_loss": cl.item(), "lambda": lam})
+        hpc = outputs.get("h_proprio_corr", torch.tensor(0.0))
+        self.log({"fm_loss": fm.item(), "cl_loss": cl.item(), "lambda": lam, "h_proprio_corr": hpc.item()})
 
         if step % 500 == 0:
-            print(f"[step {step}] fm={fm.item():.4f}  cl={cl.item():.4f}  lam={lam:.4f}")
+            print(f"[step {step}] fm={fm.item():.4f}  cl={cl.item():.4f}  lam={lam:.4f}  hpc={hpc.item():.4f}")
 
         return (loss, outputs) if return_outputs else loss
 
