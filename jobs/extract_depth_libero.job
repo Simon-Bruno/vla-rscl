@@ -1,0 +1,33 @@
+#!/bin/bash
+# extract depth maps for all LIBERO suites, both cameras
+# ~1700 episodes x 2 cameras x ~120 frames = ~400K depth maps
+# estimated time: ~2-3h on A100
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Depth-LIB
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=06:00:00
+#SBATCH --output=/scratch-shared/scur0198/logs/depth_libero_%A_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONUNBUFFERED=1
+cd $HOME/vla-rscl
+
+echo "=== extracting depth maps for LIBERO ==="
+echo "suites: 4, both cameras (image + wrist_image)"
+echo "started: $(date)"
+
+python scripts/extract_depth_maps_libero.py \
+    --data_root data/libero \
+    --batch_size 64 \
+    --model_id depth-anything/Depth-Anything-V2-Small-hf
+
+echo "finished: $(date)"
+echo "=== done ==="
