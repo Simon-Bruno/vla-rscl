@@ -57,6 +57,9 @@ class ArgsConfig:
     contrastive_loss: str = "rscl"  # "none", "vanilla_infonce", "rscl"
     tau: float = 0.2
     beta: float = 1.0
+    w_q: float = 1.0       # proprio distance weight
+    w_depth: float = 0.0   # depth distance weight
+    w_action: float = 0.0  # action distance weight
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -107,6 +110,9 @@ def main():
         contrastive_loss=config.contrastive_loss,
         tau=config.tau,
         beta=config.beta,
+        w_q=config.w_q,
+        w_depth=config.w_depth,
+        w_action=config.w_action,
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
