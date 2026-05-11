@@ -1,12 +1,14 @@
 #!/bin/bash
+# rs-cl: contrastive regularization, tune_visual, 60K steps, all 4 LIBERO suites, batch 32
+# paper-matching setup: beta=1.0, tau=0.2, lambda cosine 1->0, proj 2048->128
 
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
-#SBATCH --job-name=RSCL
+#SBATCH --job-name=RSCL-TV
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --time=48:00:00
-#SBATCH --output=/scratch-shared/scur0198/slurm_rscl_%A.out
+#SBATCH --output=/scratch-shared/scur0198/logs/rscl_tv_%A_%j.out
 
 module purge
 module load 2025
@@ -15,13 +17,25 @@ module load FFmpeg/7.1.1-GCCcore-14.2.0
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+export PYTHONUNBUFFERED=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
 cd $HOME/vla-rscl
 
 if [ -f .env ]; then set -a; source .env; set +a; fi
 
-export HF_HUB_OFFLINE=1
-export TQDM_DISABLE=1
-export WANDB_DIR=/scratch-shared/scur0198
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+OUTPUT_DIR=/scratch-shared/scur0198/outputs/libero_rscl_tv_${TIMESTAMP}
+mkdir -p $OUTPUT_DIR
+
+cat <<INFO
+=== rs-cl training (tune_visual) ===
+specs: RS-CL | tune_visual=True | beta=1.0 | tau=0.2 | 60K steps | bs=32 | lr=1e-4 | all 4 suites | seed=0
+timestamp: $TIMESTAMP
+output_dir: $OUTPUT_DIR
+slurm_job_id: $SLURM_JOB_ID
+node: $(hostname)
+INFO
 
 python -m rscl.train \
     --dataset_path \
@@ -29,11 +43,14 @@ python -m rscl.train \
         data/libero/libero_object_no_noops_1.0.0_lerobot \
         data/libero/libero_goal_no_noops_1.0.0_lerobot \
         data/libero/libero_10_no_noops_1.0.0_lerobot \
-    --output_dir /scratch-shared/scur0198/outputs/libero_rscl \
+    --output_dir $OUTPUT_DIR \
     --contrastive_loss rscl \
+    --tune_visual \
     --tau 0.2 \
     --beta 1.0 \
     --max_steps 60000 \
     --batch_size 32 \
     --video_backend torchvision_av \
     --seed 0
+
+echo "done. checkpoint: $OUTPUT_DIR"

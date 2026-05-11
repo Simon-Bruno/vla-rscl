@@ -1,0 +1,80 @@
+#!/bin/bash
+# eval single LIBERO suite (50 trials/task, paper-matching)
+# usage: sbatch jobs/eval_suite.job <checkpoint_dir> <suite> <run_name>
+# example: sbatch jobs/eval_suite.job /scratch-shared/scur0198/outputs/libero_baseline_20260510_124856 libero_spatial baseline_20260510
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Eval
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=06:00:00
+#SBATCH --output=/scratch-shared/scur0198/logs/eval_%A_%j.out
+
+CHECKPOINT=${1:?usage: sbatch eval_suite.job <checkpoint> <suite> <run_name>}
+SUITE=${2:?provide suite: libero_spatial, libero_object, libero_goal, libero_10}
+RUN_NAME=${3:?provide run_name e.g. baseline_20260510 or rscl_20260510}
+PORT=$((5555 + RANDOM % 1000))
+
+# results go to: /scratch-shared/scur0198/results/<run_name>/<suite>.log
+RESULTS_DIR=/scratch-shared/scur0198/results/${RUN_NAME}
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+export PYTHONUNBUFFERED=1
+export MUJOCO_GL=egl
+cd $HOME/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+mkdir -p $RESULTS_DIR
+
+echo "=== eval: ${RUN_NAME} / ${SUITE} ==="
+echo "checkpoint: $CHECKPOINT"
+echo "run_name: $RUN_NAME"
+echo "suite: $SUITE"
+echo "results_dir: $RESULTS_DIR"
+echo "slurm_job_id: $SLURM_JOB_ID"
+echo "node: $(hostname)"
+echo "started: $(date)"
+
+python Isaac-GR00T/scripts/inference_service.py \
+    --model_path "$CHECKPOINT" \
+    --server \
+    --data_config examples.Libero.custom_data_config:LiberoDataConfig \
+    --denoising-steps 8 \
+    --port $PORT \
+    --embodiment-tag new_embodiment &
+
+SERVER_PID=$!
+echo "server started (pid $SERVER_PID), waiting for model load..."
+sleep 90
+
+cd Isaac-GR00T
+python -c "
+import torch
+_orig = torch.load
+def _safe(*a, **kw):
+    kw.setdefault('weights_only', False)
+    return _orig(*a, **kw)
+torch.load = _safe
+import sys
+sys.argv = ['run_libero_eval', '--task_suite_name', '$SUITE', '--num_trials_per_task', '50', '--port', '$PORT', '--headless']
+exec(open('examples/Libero/eval/run_libero_eval.py').read())
+" 2>&1 | tee "$RESULTS_DIR/${SUITE}.log"
+cd ..
+
+kill $SERVER_PID 2>/dev/null
+
+RATE=$(grep 'Current total success rate' "$RESULTS_DIR/${SUITE}.log" 2>/dev/null | tail -1)
+echo ""
+echo "=== RESULT: ${RUN_NAME} / ${SUITE} ==="
+echo "$RATE"
+echo "log: $RESULTS_DIR/${SUITE}.log"
+echo "finished: $(date)"
+echo "eval complete"
