@@ -147,6 +147,31 @@ def main():
         def __getattr__(self, name):
             return getattr(self.dataset, name)
 
+    # depth-augmented dataset wrapper for libero
+    class DepthAugmentedDataset(torch.utils.data.Dataset):
+        def __init__(self, dataset, dataset_path: str):
+            self._dataset = dataset
+            self._depth_root = Path(dataset_path) / "depth_maps" / "image"  # exterior camera
+        def __len__(self):
+            return len(self._dataset)
+        def __getitem__(self, idx):
+            item = self._dataset[idx]
+            trajectory_id, base_index = self._dataset.all_steps[idx]
+            depth_path = self._depth_root / f"episode_{trajectory_id:06d}_{base_index:06d}.png"
+            if depth_path.exists():
+                import cv2
+                gray = cv2.imread(str(depth_path), cv2.IMREAD_GRAYSCALE)
+                depth_t = torch.from_numpy(gray).float() / 255.0
+                depth_t = torch.nn.functional.adaptive_avg_pool2d(
+                    depth_t.unsqueeze(0).unsqueeze(0), (8, 8)
+                )
+                item["depth_map"] = depth_t.squeeze().flatten()  # (64,)
+            else:
+                item["depth_map"] = torch.zeros(64)
+            return item
+        def __getattr__(self, name):
+            return getattr(self._dataset, name)
+
     # create datasets — for multiple paths, build a mixture
     from gr00t.data.dataset import LeRobotMixtureDataset
     datasets = []
@@ -158,6 +183,8 @@ def main():
             embodiment_tag=config.embodiment_tag,
             video_backend=config.video_backend,
         )
+        if config.w_depth > 0:
+            ds = DepthAugmentedDataset(ds, path)
         datasets.append(ds)
 
     if len(datasets) == 1:
