@@ -20,15 +20,26 @@ CAMERAS = ["observation.images.image", "observation.images.wrist_image"]
 
 
 def frames_from_video(path: Path) -> list[np.ndarray]:
-    cap = cv2.VideoCapture(str(path))
-    frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-    cap.release()
-    return frames
+    # use torchvision to handle AV1-encoded videos (opencv can't decode them)
+    try:
+        import torchvision
+        reader = torchvision.io.VideoReader(str(path), "video")
+        frames = []
+        for frame in reader:
+            img = frame["data"].permute(1, 2, 0).numpy()  # (C,H,W) -> (H,W,C)
+            frames.append(img)
+        return frames
+    except Exception:
+        # fallback to opencv
+        cap = cv2.VideoCapture(str(path))
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        cap.release()
+        return frames
 
 
 def depth_to_uint8(depth: torch.Tensor) -> np.ndarray:
