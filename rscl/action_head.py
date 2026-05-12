@@ -21,6 +21,7 @@ class RSCLConfig:
     w_q: float = 1.0      # proprio distance weight (0.0 = off)
     w_depth: float = 0.0  # depth distance weight   (0.0 = off)
     w_action: float = 0.0 # action distance weight  (0.0 = off)
+    w_vel: float = 0.0    # ee velocity distance weight (0.0 = off)
     lambda_init: float = 1.0  # cosine decayed to 0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -222,15 +223,18 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             if self.rscl_config.contrastive_loss == "vanilla_infonce":
                 cl_loss_val = vanilla_infonce_loss(z, z_aug, tau=self.rscl_config.tau)
             else:
+                ee_vel = action_input.get("ee_vel", None)
                 cl_loss_val = rs_cl_loss(
                     z, z_aug, proprio,
                     tau=self.rscl_config.tau,
                     beta=self.rscl_config.beta,
                     depth=depth,
                     action=action_step,
+                    ee_vel=ee_vel,
                     w_q=self.rscl_config.w_q,
                     w_depth=self.rscl_config.w_depth,
                     w_action=self.rscl_config.w_action,
+                    w_vel=self.rscl_config.w_vel,
                 )
 
             lam = getattr(self, "_current_lambda", self.rscl_config.lambda_init)

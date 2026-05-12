@@ -7,16 +7,17 @@ def rs_cl_weights(
     beta: float = 1.0,
     depth: torch.Tensor = None,
     action: torch.Tensor = None,
+    ee_vel: torch.Tensor = None,
     w_q: float = 1.0,
     w_depth: float = 0.0,
     w_action: float = 0.0,
+    w_vel: float = 0.0,
 ) -> torch.Tensor:
     # soft weights from multi-modal state distances
-    # d(i,j) = w_q*d_q + w_depth*d_depth + w_action*d_action  (auto-normalised)
     # set a weight to 0.0 to disable that modality
     dists = torch.zeros(proprio.shape[0], proprio.shape[0], device=proprio.device)
 
-    total = w_q + (w_depth if depth is not None else 0.0) + (w_action if action is not None else 0.0)
+    total = w_q + (w_depth if depth is not None else 0.0) + (w_action if action is not None else 0.0) + (w_vel if ee_vel is not None else 0.0)
     if total == 0.0:
         total = 1.0  # fallback: uniform weights
 
@@ -38,6 +39,10 @@ def rs_cl_weights(
         a = F.normalize(action, dim=-1)
         dists = dists + (w_action / total) * torch.cdist(a, a, p=2)
 
+    if ee_vel is not None and w_vel > 0.0:
+        v = F.normalize(ee_vel, dim=-1)
+        dists = dists + (w_vel / total) * torch.cdist(v, v, p=2)
+
     return torch.softmax(-dists / beta, dim=1)
 
 
@@ -49,9 +54,11 @@ def rs_cl_loss(
     beta: float = 1.0,
     depth: torch.Tensor = None,
     action: torch.Tensor = None,
+    ee_vel: torch.Tensor = None,
     w_q: float = 1.0,
     w_depth: float = 0.0,
     w_action: float = 0.0,
+    w_vel: float = 0.0,
 ) -> torch.Tensor:
     # infonce with multi-modal soft weights
     z = F.normalize(z, dim=-1)
@@ -60,8 +67,8 @@ def rs_cl_loss(
     logits = z @ z_aug.T / tau
     log_probs = logits - torch.logsumexp(logits, dim=1, keepdim=True)
 
-    w = rs_cl_weights(proprio, beta=beta, depth=depth, action=action,
-                      w_q=w_q, w_depth=w_depth, w_action=w_action)
+    w = rs_cl_weights(proprio, beta=beta, depth=depth, action=action, ee_vel=ee_vel,
+                      w_q=w_q, w_depth=w_depth, w_action=w_action, w_vel=w_vel)
     return -(w * log_probs).sum(dim=1).mean()
 
 

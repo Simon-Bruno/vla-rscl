@@ -60,6 +60,7 @@ class ArgsConfig:
     w_q: float = 1.0       # proprio distance weight
     w_depth: float = 0.0   # depth distance weight
     w_action: float = 0.0  # action distance weight
+    w_vel: float = 0.0     # ee velocity distance weight
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -113,6 +114,7 @@ def main():
         w_q=config.w_q,
         w_depth=config.w_depth,
         w_action=config.w_action,
+        w_vel=config.w_vel,
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
@@ -147,27 +149,48 @@ def main():
         def __getattr__(self, name):
             return getattr(self.dataset, name)
 
-    # depth-augmented dataset wrapper for libero
-    class DepthAugmentedDataset(torch.utils.data.Dataset):
-        def __init__(self, dataset, dataset_path: str):
+    # dataset wrapper that adds extra modalities (depth, ee velocity)
+    class AugmentedDataset(torch.utils.data.Dataset):
+        def __init__(self, dataset, dataset_path: str, add_depth=False, add_vel=False):
             self._dataset = dataset
-            self._depth_root = Path(dataset_path) / "depth_maps" / "image"  # exterior camera
+            self._depth_root = Path(dataset_path) / "depth_maps" / "image"
+            self._add_depth = add_depth
+            self._add_vel = add_vel
+            if add_vel:
+                # precompute raw states per episode for velocity lookup
+                import pyarrow.parquet as pq
+                self._raw_states = {}
+                data_dir = Path(dataset_path) / "data"
+                for pf in sorted(data_dir.rglob("*.parquet")):
+                    t = pq.read_table(pf, columns=["observation.state", "episode_index"])
+                    ep = t["episode_index"][0].as_py()
+                    states = t["observation.state"].to_pylist()
+                    self._raw_states[ep] = states
         def __len__(self):
             return len(self._dataset)
         def __getitem__(self, idx):
             item = self._dataset[idx]
             trajectory_id, base_index = self._dataset.all_steps[idx]
-            depth_path = self._depth_root / f"episode_{trajectory_id:06d}_{base_index:06d}.png"
-            if depth_path.exists():
-                import cv2
-                gray = cv2.imread(str(depth_path), cv2.IMREAD_GRAYSCALE)
-                depth_t = torch.from_numpy(gray).float() / 255.0
-                depth_t = torch.nn.functional.adaptive_avg_pool2d(
-                    depth_t.unsqueeze(0).unsqueeze(0), (8, 8)
-                )
-                item["depth_map"] = depth_t.squeeze().flatten()  # (64,)
-            else:
-                item["depth_map"] = torch.zeros(64)
+            if self._add_depth:
+                depth_path = self._depth_root / f"episode_{trajectory_id:06d}_{base_index:06d}.png"
+                if depth_path.exists():
+                    import cv2
+                    gray = cv2.imread(str(depth_path), cv2.IMREAD_GRAYSCALE)
+                    depth_t = torch.from_numpy(gray).float() / 255.0
+                    depth_t = torch.nn.functional.adaptive_avg_pool2d(
+                        depth_t.unsqueeze(0).unsqueeze(0), (8, 8)
+                    )
+                    item["depth_map"] = depth_t.squeeze().flatten()
+                else:
+                    item["depth_map"] = torch.zeros(64)
+            if self._add_vel:
+                states = self._raw_states.get(trajectory_id, [])
+                if base_index > 0 and base_index < len(states):
+                    cur = torch.tensor(states[base_index][:3], dtype=torch.float32)  # xyz only
+                    prev = torch.tensor(states[base_index - 1][:3], dtype=torch.float32)
+                    item["ee_vel"] = cur - prev  # (3,)
+                else:
+                    item["ee_vel"] = torch.zeros(3)
             return item
         def __getattr__(self, name):
             return getattr(self._dataset, name)
@@ -183,8 +206,8 @@ def main():
             embodiment_tag=config.embodiment_tag,
             video_backend=config.video_backend,
         )
-        if config.w_depth > 0:
-            ds = DepthAugmentedDataset(ds, path)
+        if config.w_depth > 0 or config.w_vel > 0:
+            ds = AugmentedDataset(ds, path, add_depth=(config.w_depth > 0), add_vel=(config.w_vel > 0))
         datasets.append(ds)
 
     if len(datasets) == 1:

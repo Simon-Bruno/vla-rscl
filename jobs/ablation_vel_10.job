@@ -1,0 +1,49 @@
+#!/bin/bash
+# ablation: RS-CL on Long only, w_vel=1.0 (EE velocity distance)
+# specs: RS-CL | w_q=1.0 | w_vel=1.0 | Long only | 10K steps | bs=32
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=Vel10
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=06:00:00
+#SBATCH --output=/scratch-shared/scur0198/logs/ablation_vel10_%A_%j.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
+export PYTHONUNBUFFERED=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
+cd $HOME/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+OUTPUT_DIR=/scratch-shared/scur0198/outputs/ablation_vel10_${TIMESTAMP}
+mkdir -p $OUTPUT_DIR
+
+cat <<INFO
+=== ablation: EE velocity weight = 1.0 ===
+specs: RS-CL | w_q=1.0 | w_vel=1.0 | Long only | 10K steps | bs=32
+timestamp: $TIMESTAMP
+output_dir: $OUTPUT_DIR
+INFO
+
+python -m rscl.train \
+    --dataset_path data/libero/libero_10_no_noops_1.0.0_lerobot \
+    --output_dir $OUTPUT_DIR \
+    --contrastive_loss rscl \
+    --tau 0.2 --beta 1.0 \
+    --w_q 1.0 --w_vel 1.0 \
+    --max_steps 10000 \
+    --batch_size 32 \
+    --video_backend torchvision_av \
+    --seed 0
+
+echo "done. checkpoint: $OUTPUT_DIR"
