@@ -51,37 +51,37 @@ SERVER_PID=$!
 echo "server started (pid $SERVER_PID), waiting for model load..."
 sleep 90
 
-# all 24 RoboCASA tasks
+# all 24 RoboCasa-Kitchen Panda tasks
 TASKS=(
-    "gr1_unified/PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PnPCanToDrawerClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PnPCupToDrawerClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PnPMilkToMicrowaveClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PnPPotatoToMicrowaveClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PnPWineToCabinetClose_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromCuttingboardToBasketSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromCuttingboardToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromCuttingboardToPanSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromCuttingboardToPotSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromCuttingboardToTieredbasketSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlacematToBasketSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlacematToBowlSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlacematToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlacematToTieredshelfSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlateToBowlSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlateToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlateToPanSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromPlateToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromTrayToCardboardboxSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromTrayToPlateSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromTrayToPotSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromTrayToTieredbasketSplitA_GR1ArmsAndWaistFourierHands_Env"
-    "gr1_unified/PosttrainPnPNovelFromTrayToTieredshelfSplitA_GR1ArmsAndWaistFourierHands_Env"
+    "robocasa_panda_omron/CloseDoubleDoor_PandaOmron_Env"
+    "robocasa_panda_omron/CloseDrawer_PandaOmron_Env"
+    "robocasa_panda_omron/CloseSingleDoor_PandaOmron_Env"
+    "robocasa_panda_omron/CoffeePressButton_PandaOmron_Env"
+    "robocasa_panda_omron/CoffeeServeMug_PandaOmron_Env"
+    "robocasa_panda_omron/CoffeeSetupMug_PandaOmron_Env"
+    "robocasa_panda_omron/OpenDoubleDoor_PandaOmron_Env"
+    "robocasa_panda_omron/OpenDrawer_PandaOmron_Env"
+    "robocasa_panda_omron/OpenSingleDoor_PandaOmron_Env"
+    "robocasa_panda_omron/PnPCabToCounter_PandaOmron_Env"
+    "robocasa_panda_omron/PnPCounterToCab_PandaOmron_Env"
+    "robocasa_panda_omron/PnPCounterToMicrowave_PandaOmron_Env"
+    "robocasa_panda_omron/PnPCounterToSink_PandaOmron_Env"
+    "robocasa_panda_omron/PnPCounterToStove_PandaOmron_Env"
+    "robocasa_panda_omron/PnPMicrowaveToCounter_PandaOmron_Env"
+    "robocasa_panda_omron/PnPSinkToCounter_PandaOmron_Env"
+    "robocasa_panda_omron/PnPStoveToCounter_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOffMicrowave_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOffSinkFaucet_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOffStove_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOnMicrowave_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOnSinkFaucet_PandaOmron_Env"
+    "robocasa_panda_omron/TurnOnStove_PandaOmron_Env"
+    "robocasa_panda_omron/TurnSinkSpout_PandaOmron_Env"
 )
 
 cd Isaac-GR00T
 for TASK in "${TASKS[@]}"; do
-    TASK_SHORT=$(echo "$TASK" | sed "s|gr1_unified/||" | sed "s|_GR1ArmsAndWaistFourierHands_Env||")
+    TASK_SHORT=$(echo "$TASK" | sed "s|robocasa_panda_omron/||" | sed "s|_PandaOmron_Env||")
     echo ""
     echo "=== Task: $TASK_SHORT ==="
 

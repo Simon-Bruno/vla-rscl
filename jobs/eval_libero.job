@@ -8,7 +8,7 @@
 #SBATCH --job-name=Eval-LIB
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=/scratch-shared/scur0198/logs/eval_libero_%A_%j.out
 
 CHECKPOINT=${1:?usage: sbatch eval_libero.job <checkpoint_dir> <run_name>}

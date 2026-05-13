@@ -29,7 +29,7 @@ mkdir -p $SCRATCH_OUT
 
 DATA_ROOT=data/robocasa
 DATASET_PATHS=()
-for d in "$DATA_ROOT"/*_1000; do
+for d in "$DATA_ROOT"/single_panda_gripper.*; do
     [ -d "$d" ] && DATASET_PATHS+=("$d")
 done
 

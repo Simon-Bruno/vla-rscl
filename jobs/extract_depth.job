@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu_a100
+#SBATCH --partition=gpu_h100
 #SBATCH --gpus=1
 #SBATCH --job-name=DepthFeat
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=slurm_depth_%A.out
 
 module purge
@@ -19,11 +19,11 @@ export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 cd $HOME/vla-rscl-simon/vla-rscl
 
 echo "=== extracting depth maps ==="
-echo "tasks: 24, episodes per task: 12, total: ~288 episodes, ~101k frames"
+echo "tasks: 24, episodes per task: 30, total: ~720 episodes"
 
 python scripts/extract_depth_maps.py \
     --data_root data/robocasa \
-    --n_episodes 12 \
+    --n_episodes 30 \
     --batch_size 64 \
     --model_id depth-anything/Depth-Anything-V2-Small-hf
 

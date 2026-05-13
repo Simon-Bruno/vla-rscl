@@ -18,7 +18,7 @@ echo ""
 echo "=== smoketest: robocasa ==="
 # pick first available task folder
 RC_DIR="data/robocasa"
-FIRST_TASK=$(ls -d "$RC_DIR"/*_1000 2>/dev/null | head -1)
+FIRST_TASK=$(ls -d "$RC_DIR"/single_panda_gripper.* 2>/dev/null | head -1)
 if [ -z "$FIRST_TASK" ]; then
     echo "no robocasa data found in $RC_DIR — skipping (run scripts/download_robocasa.sh first)"
     exit 0
@@ -29,7 +29,7 @@ python -m rscl.train \
     --dataset_path "$FIRST_TASK" \
     --output_dir /tmp/smoketest_robocasa \
     --data_config single_panda_gripper \
-    --embodiment_tag gr1 \
+    --embodiment_tag new_embodiment \
     --tune_visual \
     --contrastive_loss rscl \
     --max_steps 10 --save_steps 999 --report_to none \

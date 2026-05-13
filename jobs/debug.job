@@ -28,10 +28,10 @@ set +a
 
 python -m rscl.train_robocasa \
     --dataset_path \
-        data/robocasa/gr1_unified.PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_1000 \
+        data/robocasa/single_panda_gripper.PnPCounterToCab \
     --output_dir outputs/debug \
     --data_config single_panda_gripper \
-    --embodiment_tag gr1 \
+    --embodiment_tag new_embodiment \
     --tune_visual \
     --contrastive_loss rscl \
     --tau 0.2 \

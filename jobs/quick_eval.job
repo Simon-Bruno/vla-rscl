@@ -10,7 +10,6 @@
 #SBATCH --output=/scratch-shared/scur0198/slurm_quick_eval_%A.out
 
 # usage: sbatch jobs/quick_eval.job <checkpoint_dir> [suite]
-# example: sbatch jobs/quick_eval.job /scratch-shared/scur0198/outputs/quick_rscl libero_spatial
 
 CHECKPOINT=${1:-/scratch-shared/scur0198/outputs/quick_baseline}
 SUITE=${2:-libero_spatial}
@@ -23,13 +22,10 @@ module load FFmpeg/7.1.1-GCCcore-14.2.0
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl/Isaac-GR00T:$PYTHONPATH
-export HF_HUB_OFFLINE=1
 export MUJOCO_GL=egl
 cd $HOME/vla-rscl
 
 if [ -f .env ]; then set -a; source .env; set +a; fi
-
-export TORCH_SERIALIZATION_WEIGHTS_ONLY=0
 
 echo "evaluating checkpoint: $CHECKPOINT on suite: $SUITE"
 
@@ -46,11 +42,17 @@ echo "server started (pid $SERVER_PID), waiting for model load..."
 sleep 60
 
 cd Isaac-GR00T
-python -m examples.Libero.eval.run_libero_eval \
-    --task_suite_name "$SUITE" \
-    --num_trials_per_task 30 \
-    --port $PORT \
-    --headless
+python -c "
+import torch
+_orig = torch.load
+def _safe(*a, **kw):
+    kw.setdefault('weights_only', False)
+    return _orig(*a, **kw)
+torch.load = _safe
+import sys
+sys.argv = ['run_libero_eval', '--task_suite_name', '$SUITE', '--num_trials_per_task', '30', '--port', '$PORT', '--headless']
+exec(open('examples/Libero/eval/run_libero_eval.py').read())
+"
 cd ..
 
 kill $SERVER_PID 2>/dev/null
