@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=SMOKE-RC
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:30:00
+#SBATCH --output=slurm_smoke_robocasa_panda_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/bin:$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
+
+set -a
+source .env
+set +a
+
+python -m rscl.train_robocasa \
+    --dataset_path data/robocasa/single_panda_gripper.PnPCounterToCab \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_robocasa_panda \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --max_steps 100 \
+    --batch_size 2 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 999999 \
+    --max_demos_per_task 10 \
+    --video_backend torchvision_av \
+    --report_to none \
+    --seed 0
+
+echo "Smoke test done. Check logs for 3 camera views (left_view, right_view, wrist_view)."
