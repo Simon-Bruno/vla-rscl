@@ -1,0 +1,150 @@
+\documentclass[10pt]{beamer}
+
+\usetheme[progressbar=frametitle]{metropolis}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{tikz}
+
+\title{Improving VLA Models with\\Contrastive Representation Learning}
+\subtitle{DL2 Project Update — Week 2, May 13 2026}
+\author{Simon Bruno · Finley Helms · Sem IJsendijk · Lev Hulsbergen · Mitch Boontjes · Wes André}
+\institute{University of Amsterdam}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% ── SLIDE 1: What we did ────────────────────────────────────
+\begin{frame}{What We Did This Week}
+
+\textbf{Switched to LIBERO benchmark} (from RoboCasa)
+\begin{itemize}
+  \item 4 suites: Spatial · Object · Goal · Long (10 tasks each)
+  \item 2 cameras (exterior + wrist) — ViewCutoff works correctly
+  \item Faster iteration: 12h training vs 48h on RoboCasa
+\end{itemize}
+
+\vspace{0.8em}
+
+\textbf{RS-CL reproduction} (60K steps, frozen VLM, all 4 suites)
+\begin{itemize}
+  \item Baseline and RS-CL trained with paper-matching setup
+  \item Fixed: token alignment, $\beta=1.0$, 256 tokens/view
+\end{itemize}
+
+\vspace{0.8em}
+
+\textbf{Modality ablations} (10K steps, Long only)
+\begin{itemize}
+  \item Depth maps extracted (547K PNGs, Depth-Anything-V2)
+  \item Tested: depth, action, EE velocity as soft-label distances
+\end{itemize}
+
+\end{frame}
+
+% ── SLIDE 2: Main results ───────────────────────────────────
+\begin{frame}{RS-CL Reproduction Results}
+
+\begin{table}
+  \centering
+  \small
+  \begin{tabular}{lccccc}
+    \toprule
+    \textbf{Method} & \textbf{Spatial} & \textbf{Object} & \textbf{Goal} & \textbf{Long} & \textbf{Avg.} \\
+    \midrule
+    Paper baseline   & 98.2 & 99.4 & 97.2 & 87.8 & 95.7 \\
+    Paper + RS-CL    & 98.4 & 98.6 & 98.2 & \textbf{90.4} & 96.4 \\
+    \midrule
+    Our baseline     & 97.6 & 93.2 & 93.6 & 85.8 & 92.6 \\
+    Our + RS-CL      & 97.0 & 93.2 & 91.8 & \textbf{87.6} & 92.4 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\vspace{0.5em}
+
+\begin{itemize}
+  \item RS-CL improves \alert{Long tasks by +1.8\%} (paper: +2.6\%)
+  \item Spatial/Object near ceiling — no room for improvement
+  \item Matches the paper's pattern: gains on harder, multi-step tasks
+\end{itemize}
+
+\end{frame}
+
+% ── SLIDE 3: Modality ablation ──────────────────────────────
+\begin{frame}{Modality Ablation — Depth Works!}
+
+\begin{table}
+  \centering
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Soft-label distance} & $w_\text{depth}$ & $w_\text{action}$ & $w_\text{vel}$ & \textbf{Long (\%)} \\
+    \midrule
+    Proprio only (control) & 0 & 0 & 0 & 90.2 \\
+    \alert{+ Depth}        & 1 & 0 & 0 & \alert{\textbf{92.0}} \\
+    + Action               & 0 & 1 & 0 & eval pending \\
+    + Velocity             & 0 & 0 & 1 & pending \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\vspace{0.5em}
+
+\begin{itemize}
+  \item \textbf{Depth: +1.8\%} over proprio-only RS-CL on Long
+  \item Depth adds 3D geometry the 2D vision encoder can't see
+  \item Action: no change in training proxy (hpc); eval pending
+  \item Velocity \& 30K depth evals running overnight
+\end{itemize}
+
+\end{frame}
+
+% ── SLIDE 4: Key insight ────────────────────────────────────
+\begin{frame}{Key Insight: Contrastive Loss Dynamics}
+
+\textbf{Observation:} $\mathcal{L}_\text{CL}$ stays flat at $\sim\!\log B$ throughout training
+
+\vspace{0.5em}
+
+\begin{itemize}
+  \item $\cos(z, \hat{z})$ collapses to 0.99 by step 3K
+  \item Self-attention adapter reconstructs masked camera view
+  \item \textbf{But RS-CL still helps} — gradients reshape adapter representations (h) to align with proprio
+  \item We added \textbf{hpc} (h-proprio correlation) metric to track this
+\end{itemize}
+
+\vspace{0.8em}
+
+\textbf{Implication:} RS-CL works through gradient-level representation shaping, not explicit contrastive loss minimization. The paper doesn't report $\mathcal{L}_\text{CL}$ trajectories.
+
+\end{frame}
+
+% ── SLIDE 5: Next steps ─────────────────────────────────────
+\begin{frame}{Next Steps}
+
+\textbf{This week (May 13--20):}
+\begin{itemize}
+  \item Finish depth/velocity eval results
+  \item Full 60K depth run on all 4 suites (if 10K results hold)
+  \item Implement GRAM as alternative contrastive objective
+  \item Start writing discussion + analysis sections
+\end{itemize}
+
+\vspace{0.8em}
+
+\textbf{Week 3 (May 20--27):}
+\begin{itemize}
+  \item Final results table with all ablations
+  \item Finalize 4-page report
+  \item Clean repo + reproducibility check
+\end{itemize}
+
+\vspace{0.8em}
+
+\textbf{Open question:} Should we also run on RoboCasa for cross-benchmark validation, or focus on LIBERO depth?
+
+\end{frame}
+
+\end{document}
