@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=smk-action
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=00:30:00
+#SBATCH --output=slurm_smk_action_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
+
+set -a
+source .env
+set +a
+
+DATA_ROOT=data/robocasa
+DATASET_PATHS=()
+for d in "$DATA_ROOT"/*_1000; do
+    [ -d "$d" ] && DATASET_PATHS+=("$d")
+done
+
+echo "=== smoke test: action only (w_q=1.0, w_depth=0.0, w_action=1.0) ==="
+
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_action \
+    --data_config single_panda_gripper \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 1.0 \
+    --w_q 1.0 \
+    --w_depth 0.0 \
+    --w_action 1.0 \
+    --max_steps 200 \
+    --batch_size 4 \
+    --gradient_accumulation_steps 2 \
+    --save_steps 10000 \
+    --save_total_limit 1 \
+    --max_demos_total 50 \
+    --video_backend torchvision_av \
+    --report_to none \
+    --seed 0
+
+echo "=== done ==="

@@ -42,7 +42,7 @@ echo "=== Results dir: $RESULTS_DIR ==="
 python Isaac-GR00T/scripts/inference_service.py \
     --model_path "$CHECKPOINT" \
     --server \
-    --data_config fourier_gr1_arms_waist \
+    --data_config single_panda_gripper \
     --denoising-steps 8 \
     --port $PORT \
     --embodiment-tag new_embodiment &

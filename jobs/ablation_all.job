@@ -1,18 +1,12 @@
 #!/bin/bash
-# Baseline with DiT UNFROZEN — proper apples-to-apples comparison vs ablation_rscl_tunedit
-# No contrastive loss, unfrozen DiT — matches paper's standard fine-tuning setup
-# Compare against:
-#   ablation_baseline_30d         = no CL,  frozen DiT
-#   ablation_rscl_tunedit_30d     = RS-CL,  unfrozen DiT (paper-matching)
-#   ablation_baseline_tunedit_30d = no CL,  unfrozen DiT (this job, paper baseline)
 
 #SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
-#SBATCH --job-name=base-tunedit
+#SBATCH --job-name=abl-all
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=30:00:00
-#SBATCH --output=/scratch-shared/scur0198/slurm_ablation_baseline_tunedit_%A.out
+#SBATCH --time=24:00:00
+#SBATCH --output=slurm_ablation_all_%A.out
 
 module purge
 module load 2025
@@ -23,17 +17,14 @@ conda activate rscl
 
 export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
-export HF_HUB_OFFLINE=1
-export TQDM_DISABLE=1
-export WANDB_DIR=/scratch-shared/scur0198
 cd $HOME/vla-rscl-simon/vla-rscl
 
 set -a
 source .env
 set +a
 
-SCRATCH_OUT=/scratch-shared/scur0198/outputs/ablation_baseline_tunedit_30d
-HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/ablation_baseline_tunedit_30d
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/ablation_all_30d
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/ablation_all_30d
 mkdir -p $SCRATCH_OUT
 
 DATA_ROOT=data/robocasa
@@ -47,8 +38,14 @@ python -m rscl.train_robocasa \
     --output_dir $SCRATCH_OUT \
     --data_config single_panda_gripper \
     --tune_visual \
-    --contrastive_loss none \
-    --max_steps 60000 \
+    --no-tune-diffusion-model \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --w_depth 1.0 \
+    --w_action 1.0 \
+    --max_steps 30000 \
     --batch_size 8 \
     --gradient_accumulation_steps 8 \
     --save_steps 5000 \

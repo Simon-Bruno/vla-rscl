@@ -1,6 +1,7 @@
 #!/bin/bash
-# download robocasa 24k trajectory dataset (1000 per task, 24 tasks)
-# from nvidia/PhysicalAI-Robotics-GR00T-X-Embodiment-Sim on huggingface
+# download robocasa 72k trajectory dataset (3000 per task, 24 tasks)
+# single_panda_gripper from nvidia/PhysicalAI-Robotics-GR00T-X-Embodiment-Sim
+# these are the RoboCasa-Kitchen Panda arm tasks matching the RS-CL paper
 
 set -e
 
@@ -15,8 +16,8 @@ if [ ! -d ".git" ]; then
 fi
 
 git sparse-checkout init --cone
-git sparse-checkout set "**/*_1000/"
+git sparse-checkout set single_panda_gripper.*
 git checkout main
 
 echo "downloaded robocasa datasets to $DATA_DIR"
-ls -d *_1000/ 2>/dev/null | wc -l | xargs -I{} echo "{} task folders found"
+ls -d single_panda_gripper.*/ 2>/dev/null | wc -l | xargs -I{} echo "{} task folders found"

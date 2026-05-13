@@ -35,7 +35,7 @@ class ArgsConfig:
     # dataset
     dataset_path: List[str] = None
     output_dir: str = "./outputs"
-    data_config: str = "fourier_gr1_arms_waist"
+    data_config: str = "single_panda_gripper"
 
     # model
     base_model_path: str = "nvidia/GR00T-N1.5-3B"
@@ -66,8 +66,8 @@ class ArgsConfig:
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
-    n_views: int = 2
-    tokens_per_view: int = 128  # 1 camera, 256 tokens split into 2 virtual views
+    n_views: int = 3
+    tokens_per_view: int = 256  # 3 cameras (left_view, right_view, wrist_view), 256 tokens each
 
     # data
     embodiment_tag: str = "new_embodiment"

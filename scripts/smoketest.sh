@@ -28,7 +28,7 @@ echo "using: $FIRST_TASK"
 python -m rscl.train \
     --dataset_path "$FIRST_TASK" \
     --output_dir /tmp/smoketest_robocasa \
-    --data_config fourier_gr1_arms_waist \
+    --data_config single_panda_gripper \
     --embodiment_tag gr1 \
     --tune_visual \
     --contrastive_loss rscl \

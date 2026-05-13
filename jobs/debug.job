@@ -30,7 +30,7 @@ python -m rscl.train_robocasa \
     --dataset_path \
         data/robocasa/gr1_unified.PnPBottleToCabinetClose_GR1ArmsAndWaistFourierHands_1000 \
     --output_dir outputs/debug \
-    --data_config fourier_gr1_arms_waist \
+    --data_config single_panda_gripper \
     --embodiment_tag gr1 \
     --tune_visual \
     --contrastive_loss rscl \

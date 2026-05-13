@@ -1,0 +1,137 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_h100
+#SBATCH --gpus=1
+#SBATCH --job-name=smoke
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=00:30:00
+#SBATCH --output=slurm_smoke_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
+
+set -a
+source .env
+set +a
+
+DATA_ROOT=data/robocasa
+DATASET_PATHS=()
+for d in "$DATA_ROOT"/*_1000; do
+    [ -d "$d" ] && DATASET_PATHS+=("$d")
+done
+
+echo "=== Smoke: baseline ==="
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_baseline \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --no-tune-diffusion-model \
+    --contrastive_loss none \
+    --max_steps 50 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 9999 \
+    --max_demos_per_task 2 \
+    --video_backend torchvision_av \
+    --seed 0
+echo "=== Smoke baseline done ==="
+
+echo "=== Smoke: rscl (w_depth=0, w_action=0) ==="
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_rscl \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --no-tune-diffusion-model \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --w_depth 0.0 \
+    --w_action 0.0 \
+    --max_steps 50 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 9999 \
+    --max_demos_per_task 2 \
+    --video_backend torchvision_av \
+    --seed 0
+echo "=== Smoke rscl done ==="
+
+echo "=== Smoke: depth ==="
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_depth \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --no-tune-diffusion-model \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --w_depth 1.0 \
+    --w_action 0.0 \
+    --max_steps 50 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 9999 \
+    --max_demos_per_task 2 \
+    --video_backend torchvision_av \
+    --seed 0
+echo "=== Smoke depth done ==="
+
+echo "=== Smoke: action ==="
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_action \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --no-tune-diffusion-model \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --w_depth 0.0 \
+    --w_action 1.0 \
+    --max_steps 50 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 9999 \
+    --max_demos_per_task 2 \
+    --video_backend torchvision_av \
+    --seed 0
+echo "=== Smoke action done ==="
+
+echo "=== Smoke: all ==="
+python -m rscl.train_robocasa \
+    --dataset_path "${DATASET_PATHS[@]}" \
+    --output_dir /scratch-shared/scur0198/outputs/smoke_all \
+    --data_config single_panda_gripper \
+    --tune_visual \
+    --no-tune-diffusion-model \
+    --contrastive_loss rscl \
+    --tau 0.2 \
+    --beta 0.3 \
+    --w_q 1.0 \
+    --w_depth 1.0 \
+    --w_action 1.0 \
+    --max_steps 50 \
+    --batch_size 8 \
+    --gradient_accumulation_steps 1 \
+    --save_steps 9999 \
+    --max_demos_per_task 2 \
+    --video_backend torchvision_av \
+    --seed 0
+echo "=== Smoke all done ==="
+
+echo "All smoke tests passed!"
