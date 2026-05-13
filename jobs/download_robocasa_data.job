@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#SBATCH --partition=staging
+#SBATCH --job-name=DL-RC
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
+#SBATCH --time=04:00:00
+#SBATCH --output=slurm_download_robocasa_%A.out
+
+export PATH=$HOME/bin:$PATH
+
+cd /scratch-shared/scur0198
+rm -rf robocasa_panda
+bash $HOME/vla-rscl-simon/vla-rscl/scripts/download_robocasa.sh /scratch-shared/scur0198/robocasa_panda
+
+echo "Download complete. Verifying..."
+ls -d /scratch-shared/scur0198/robocasa_panda/single_panda_gripper.* | wc -l
+echo "task folders found"
+find /scratch-shared/scur0198/robocasa_panda/single_panda_gripper.PnPCounterToCab -name '*.parquet' | wc -l
+echo "parquet files in PnPCounterToCab"
