@@ -9,7 +9,7 @@ from transformers.feature_extraction_utils import BatchFeature
 
 from gr00t.model.action_head.flow_matching_action_head import FlowmatchingActionHead
 
-from .losses import rs_cl_loss, vanilla_infonce_loss
+from .losses import rs_cl_loss, vanilla_infonce_loss, gram_volume_loss
 
 
 @dataclass
@@ -22,6 +22,7 @@ class RSCLConfig:
     w_depth: float = 0.0  # depth distance weight   (0.0 = off)
     w_action: float = 0.0 # action distance weight  (0.0 = off)
     w_vel: float = 0.0    # ee velocity distance weight (0.0 = off)
+    lambda_gram: float = 0.0  # gram volume loss weight (0.0 = disabled)
     lambda_init: float = 1.0  # cosine decayed to 0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -97,6 +98,16 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         self.summary_token = nn.Parameter(torch.randn(1, 1, d_model) * 0.02)
         self.projector = Projector(d_model, rscl_config.proj_hidden, rscl_config.proj_dim)
         self.view_cutoff = ViewCutoff(rscl_config.n_views, rscl_config.tokens_per_view)
+
+        # per-modality projectors for GRAM volume alignment loss
+        # maps each sensor modality into the shared contrastive space (proj_dim)
+        if rscl_config.lambda_gram > 0.0:
+            gram_hidden = 256
+            self.gram_proj_proprio = Projector(64, gram_hidden, rscl_config.proj_dim)
+            if rscl_config.w_depth > 0.0:
+                self.gram_proj_depth = Projector(64, gram_hidden, rscl_config.proj_dim)
+            if rscl_config.w_vel > 0.0:
+                self.gram_proj_vel = Projector(3, gram_hidden, rscl_config.proj_dim)
 
     def _adapt_with_summary(self, backbone_features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # run features + summary token through the adapter (vlln + vl_self_attention)
@@ -211,6 +222,7 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
         # contrastive loss
         total_loss = fm_loss
         cl_loss_val = torch.tensor(0.0, device=device)
+        gram_loss_val = torch.tensor(0.0, device=device)
 
         if self.rscl_config.contrastive_loss != "none" and "_rscl_z" in backbone_output:
             z = backbone_output["_rscl_z"]
@@ -240,6 +252,19 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             lam = getattr(self, "_current_lambda", self.rscl_config.lambda_init)
             total_loss = fm_loss + lam * cl_loss_val
 
+            # GRAM volume loss: encourage cross-modal alignment by minimizing
+            # the volume of the parallelotope spanned by modality embeddings
+            if self.rscl_config.lambda_gram > 0.0:
+                gram_embeds = [F.normalize(z, dim=-1)]
+                gram_embeds.append(F.normalize(self.gram_proj_proprio(proprio), dim=-1))
+                if depth is not None and hasattr(self, "gram_proj_depth"):
+                    gram_embeds.append(F.normalize(self.gram_proj_depth(depth), dim=-1))
+                if ee_vel is not None and hasattr(self, "gram_proj_vel"):
+                    gram_embeds.append(F.normalize(self.gram_proj_vel(ee_vel), dim=-1))
+                if len(gram_embeds) >= 2:
+                    gram_loss_val = gram_volume_loss(gram_embeds)
+                    total_loss = total_loss + self.rscl_config.lambda_gram * gram_loss_val
+
         # measure h-proprio alignment (proxy for CKNNA)
         h_proprio_corr = torch.tensor(0.0, device=device)
         if "_rscl_w" in backbone_output:
@@ -259,6 +284,7 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             "loss": total_loss,
             "fm_loss": fm_loss.detach(),
             "cl_loss": cl_loss_val.detach(),
+            "gram_loss": gram_loss_val.detach(),
             "h_proprio_corr": h_proprio_corr.detach(),
         }
         return BatchFeature(data=output_dict)

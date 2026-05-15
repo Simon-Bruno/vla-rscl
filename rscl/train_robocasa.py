@@ -63,6 +63,7 @@ class ArgsConfig:
     w_q: float = 1.0      # proprio distance weight (0.0 = off)
     w_depth: float = 0.0  # depth distance weight   (0.0 = off)
     w_action: float = 0.0 # action distance weight  (0.0 = off)
+    lambda_gram: float = 0.0  # gram volume loss weight (0.0 = disabled)
     lambda_init: float = 1.0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -100,11 +101,13 @@ class RSCLTrainer(DualBrainTrainer):
         # log contrastive metrics to wandb
         fm = outputs.get("fm_loss", torch.tensor(0.0))
         cl = outputs.get("cl_loss", torch.tensor(0.0))
+        gram = outputs.get("gram_loss", torch.tensor(0.0))
         hpc = outputs.get("h_proprio_corr", torch.tensor(0.0))
-        self.log({"fm_loss": fm.item(), "cl_loss": cl.item(), "lambda": lam, "h_proprio_corr": hpc.item()})
+        self.log({"fm_loss": fm.item(), "cl_loss": cl.item(), "gram_loss": gram.item(),
+                  "lambda": lam, "h_proprio_corr": hpc.item()})
 
         if step % 500 == 0:
-            print(f"[step {step}] fm={fm.item():.4f}  cl={cl.item():.4f}  lam={lam:.4f}  hpc={hpc.item():.4f}")
+            print(f"[step {step}] fm={fm.item():.4f}  cl={cl.item():.4f}  gram={gram.item():.4f}  lam={lam:.4f}  hpc={hpc.item():.4f}")
 
         return (loss, outputs) if return_outputs else loss
 
@@ -121,6 +124,7 @@ def main():
         w_q=config.w_q,
         w_depth=config.w_depth,
         w_action=config.w_action,
+        lambda_gram=config.lambda_gram,
         lambda_init=config.lambda_init,
         proj_hidden=config.proj_hidden,
         proj_dim=config.proj_dim,
@@ -248,8 +252,9 @@ def main():
             if "summary_token" in name or "projector" in name or "view_cutoff" in name:
                 p.requires_grad = True
 
-        n_rscl = sum(p.numel() for p in [rscl_head.summary_token] + list(rscl_head.projector.parameters()))
-        print(f"rs-cl added {n_rscl:,} trainable params (summary token + projector)")
+        gram_params = [p for n, p in rscl_head.named_parameters() if "gram_proj" in n]
+        n_rscl = sum(p.numel() for p in [rscl_head.summary_token] + list(rscl_head.projector.parameters()) + gram_params)
+        print(f"rs-cl added {n_rscl:,} trainable params (summary token + projector + gram)")
 
     training_args = TrainingArguments(
         output_dir=config.output_dir,

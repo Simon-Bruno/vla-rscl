@@ -1,5 +1,5 @@
 from .action_head import FlowmatchingWithRSCL, RSCLConfig, ViewCutoff, Projector
-from .losses import rs_cl_loss, vanilla_infonce_loss
+from .losses import rs_cl_loss, vanilla_infonce_loss, gram_volume_loss
 
 __all__ = [
     "FlowmatchingWithRSCL",
@@ -8,4 +8,5 @@ __all__ = [
     "Projector",
     "rs_cl_loss",
     "vanilla_infonce_loss",
+    "gram_volume_loss",
 ]
