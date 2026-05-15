@@ -32,7 +32,7 @@ python -m rscl.train \
     --tau 0.2 \
     --beta 1.0 \
     --w_q 1.0 \
-    --lambda_gram 0.1 \
+    --lambda_gram 0.5 \
     --max_steps 10000 \
     --batch_size 32 \
     --save_steps 2500 \
