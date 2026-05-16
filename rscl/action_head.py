@@ -255,7 +255,7 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             # GRAM volume loss: encourage cross-modal alignment by minimizing
             # the volume of the parallelotope spanned by modality embeddings
             if self.rscl_config.lambda_gram > 0.0:
-                gram_embeds = [F.normalize(z, dim=-1)]
+                gram_embeds = [F.normalize(z.detach(), dim=-1)]  # detach: z is anchor, GRAM only trains modality projectors
                 gram_embeds.append(F.normalize(self.gram_proj_proprio(proprio), dim=-1))
                 if depth is not None and hasattr(self, "gram_proj_depth"):
                     gram_embeds.append(F.normalize(self.gram_proj_depth(depth), dim=-1))
