@@ -34,7 +34,7 @@ python -m rscl.train \
     --w_q 1.0 \
     --w_depth 0.5 \
     --w_vel 1.0 \
-    --lambda_gram 0.5 \
+    --lambda_gram 0.05 \
     --max_steps 10000 \
     --batch_size 32 \
     --save_steps 2500 \
