@@ -104,7 +104,7 @@ def gram_volume_loss(embeddings: list[torch.Tensor]) -> torch.Tensor:
     assert len(embeddings) >= 2, f"gram_volume_loss requires >= 2 modalities, got {len(embeddings)}"
     A = torch.stack(embeddings, dim=1)                # (B, k, d)
     G = torch.bmm(A, A.transpose(1, 2))              # (B, k, k)
-    # slogdet requires float32 (bf16 not supported)
-    _sign, logabsdet = torch.linalg.slogdet(G.float())  # (B,)
-    log_vol = 0.5 * logabsdet.clamp(min=-20.0)
-    return log_vol.exp().mean()
+    # det + clamp + sqrt is simpler and more stable than slogdet for small k
+    det_G = torch.linalg.det(G.float())               # (B,)
+    vol = det_G.clamp(min=1e-8).sqrt()                 # (B,)
+    return vol.mean()
