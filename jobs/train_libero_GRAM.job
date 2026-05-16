@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu_a100
 #SBATCH --gpus=1
-#SBATCH --job-name=GRAM-RC
+#SBATCH --job-name=GRAM-L
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
-#SBATCH --time=16:00:00
-#SBATCH --output=slurm_gram_robocasa_30_%A.out
+#SBATCH --time=48:00:00
+#SBATCH --output=/scratch-shared/scur0198/slurm_libero_gram_%A.out
 
 module purge
 module load 2025
@@ -19,43 +19,33 @@ export PATH=$HOME/.conda/envs/rscl/bin:$PATH
 export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
 cd $HOME/vla-rscl-simon/vla-rscl
 
-set -a
-source .env
-set +a
+if [ -f .env ]; then set -a; source .env; set +a; fi
 
-SCRATCH_OUT=/scratch-shared/scur0198/outputs/gram_robocasa_30
-HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/gram_robocasa_30
+export HF_HUB_OFFLINE=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
+
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/libero_gram
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/libero_gram
 mkdir -p $SCRATCH_OUT
 
-DATA_ROOT=data/robocasa
-DATASET_PATHS=()
-for d in "$DATA_ROOT"/*_1000; do
-    [ -d "$d" ] && DATASET_PATHS+=("$d")
-done
-
-if [ ${#DATASET_PATHS[@]} -eq 0 ]; then
-    echo "No RoboCasa task folders found in $DATA_ROOT"
-    exit 1
-fi
-
-python -m rscl.train_robocasa_GRAM \
-    --dataset_path "${DATASET_PATHS[@]}" \
+python -m rscl.train_GRAM \
+    --dataset_path \
+        data/libero/libero_spatial_no_noops_1.0.0_lerobot \
+        data/libero/libero_object_no_noops_1.0.0_lerobot \
+        data/libero/libero_goal_no_noops_1.0.0_lerobot \
+        data/libero/libero_10_no_noops_1.0.0_lerobot \
     --output_dir $SCRATCH_OUT \
-    --data_config fourier_gr1_arms_waist \
-    --embodiment_tag gr1 \
-    --tune_visual \
     --contrastive_loss rscl_gram \
     --tau 0.2 \
-    --beta 0.3 \
+    --beta 1.0 \
     --w_q 1.0 \
     --w_depth 1.0 \
     --w_vel 1.0 \
-    --max_steps 30000 \
-    --batch_size 8 \
-    --gradient_accumulation_steps 8 \
+    --max_steps 60000 \
+    --batch_size 32 \
     --save_steps 5000 \
     --save_total_limit 2 \
-    --max_demos_per_task 30 \
     --video_backend torchvision_av \
     --seed 0
 

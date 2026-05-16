@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_a100
+#SBATCH --gpus=1
+#SBATCH --job-name=TST-GRAM-L
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=18
+#SBATCH --time=02:00:00
+#SBATCH --output=/scratch-shared/scur0198/slurm_test_libero_gram_%A.out
+
+module purge
+module load 2025
+module load Anaconda3/2025.06-1
+module load FFmpeg/7.1.1-GCCcore-14.2.0
+eval "$(conda shell.bash hook)"
+conda activate rscl
+
+export PATH=$HOME/.conda/envs/rscl/bin:$PATH
+export PYTHONPATH=$HOME/vla-rscl-simon/vla-rscl/Isaac-GR00T:$PYTHONPATH
+cd $HOME/vla-rscl-simon/vla-rscl
+
+if [ -f .env ]; then set -a; source .env; set +a; fi
+
+export HF_HUB_OFFLINE=1
+export TQDM_DISABLE=1
+export WANDB_DIR=/scratch-shared/scur0198
+
+SCRATCH_OUT=/scratch-shared/scur0198/outputs/test_libero_gram
+HOME_OUT=$HOME/vla-rscl-simon/vla-rscl/outputs/test_libero_gram
+mkdir -p $SCRATCH_OUT
+
+python -m rscl.train_GRAM \
+    --dataset_path \
+        data/libero/libero_spatial_no_noops_1.0.0_lerobot \
+    --output_dir $SCRATCH_OUT \
+    --contrastive_loss rscl_gram \
+    --tau 0.2 \
+    --beta 1.0 \
+    --w_q 1.0 \
+    --w_depth 0.0 \
+    --w_vel 1.0 \
+    --max_steps 100 \
+    --batch_size 4 \
+    --dataloader_num_workers 2 \
+    --save_steps 999999 \
+    --video_backend torchvision_av \
+    --report_to none \
+    --seed 0
+
+echo "Copying results back to home..."
+mkdir -p $HOME_OUT
+cp $SCRATCH_OUT/*.safetensors $SCRATCH_OUT/*.json $HOME_OUT/ 2>/dev/null || true
+cp -r $SCRATCH_OUT/experiment_cfg $HOME_OUT/ 2>/dev/null || true
+echo "Done. Results in $HOME_OUT"
