@@ -108,3 +108,26 @@ def gram_volume_loss(embeddings: list[torch.Tensor]) -> torch.Tensor:
     det_G = torch.linalg.det(G.float())               # (B,)
     vol = det_G.clamp(min=1e-8).sqrt()                 # (B,)
     return vol.mean()
+
+
+def unialign_uniformity(z: torch.Tensor, tau: float = 2.0) -> torch.Tensor:
+    """Intra-modality uniformity loss (Yin et al., 2026, Eq. 9).
+
+    Encourages embeddings within a single modality to spread uniformly
+    on the hypersphere via a Gaussian kernel. Returns a negative value
+    (more negative = more uniform). Minimizing this prevents collapse.
+
+    Args:
+        z: (B, d) L2-normalized embeddings from one modality.
+        tau: temperature for the Gaussian kernel.
+    """
+    B = z.shape[0]
+    if B < 2:
+        return torch.tensor(0.0, device=z.device)
+    # pairwise squared L2 distances
+    dists_sq = torch.cdist(z.float(), z.float(), p=2).pow(2)  # (B, B)
+    kernel = torch.exp(-dists_sq / (2 * tau ** 2))
+    # exclude self-similarity (diagonal)
+    mask = ~torch.eye(B, dtype=torch.bool, device=z.device)
+    avg_kernel = kernel[mask].view(B, B - 1).mean(dim=1)
+    return torch.log(avg_kernel + 1e-8).mean()

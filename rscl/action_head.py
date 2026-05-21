@@ -9,7 +9,7 @@ from transformers.feature_extraction_utils import BatchFeature
 
 from gr00t.model.action_head.flow_matching_action_head import FlowmatchingActionHead
 
-from .losses import rs_cl_loss, vanilla_infonce_loss, gram_volume_loss
+from .losses import rs_cl_loss, vanilla_infonce_loss, gram_volume_loss, unialign_uniformity
 
 
 @dataclass
@@ -23,6 +23,8 @@ class RSCLConfig:
     w_action: float = 0.0 # action distance weight  (0.0 = off)
     w_vel: float = 0.0    # ee velocity distance weight (0.0 = off)
     lambda_gram: float = 0.0  # gram volume loss weight (0.0 = disabled)
+    lambda_uniform: float = 0.0  # UniAlign uniformity weight on z (0.0 = disabled)
+    tau_uniform: float = 2.0    # temperature for uniformity kernel
     lambda_init: float = 1.0  # cosine decayed to 0
     proj_hidden: int = 2048
     proj_dim: int = 128
@@ -265,6 +267,14 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
                     gram_loss_val = gram_volume_loss(gram_embeds)
                     total_loss = total_loss + self.rscl_config.lambda_gram * gram_loss_val
 
+        # UniAlign uniformity: spread z on the hypersphere to prevent
+        # modality gap (Yin et al., 2026). No projectors needed.
+        uniform_loss_val = torch.tensor(0.0, device=device)
+        if self.rscl_config.lambda_uniform > 0.0 and "_rscl_z" in backbone_output:
+            z_norm = F.normalize(backbone_output["_rscl_z"], dim=-1)
+            uniform_loss_val = unialign_uniformity(z_norm, tau=self.rscl_config.tau_uniform)
+            total_loss = total_loss + self.rscl_config.lambda_uniform * uniform_loss_val
+
         # measure h-proprio alignment (proxy for CKNNA)
         h_proprio_corr = torch.tensor(0.0, device=device)
         if "_rscl_w" in backbone_output:
@@ -285,6 +295,7 @@ class FlowmatchingWithRSCL(FlowmatchingActionHead):
             "fm_loss": fm_loss.detach(),
             "cl_loss": cl_loss_val.detach(),
             "gram_loss": gram_loss_val.detach(),
+            "uniform_loss": uniform_loss_val.detach(),
             "h_proprio_corr": h_proprio_corr.detach(),
         }
         return BatchFeature(data=output_dict)
